@@ -1,8 +1,13 @@
 import { useEffect } from 'react';
 
-const useClickEvents = (setTextPosition, setCurrentText, setIsEditing, inputRef) => {
+const useClickEvents = (setTextPosition, setCurrentText, setIsEditing, inputRef, isAudioPlaying) => {
   useEffect(() => {
     const handleClick = (e) => {
+      // Don't allow text input if audio is playing
+      if (isAudioPlaying) {
+        return;
+      }
+
       // Don't trigger text input if user is selecting text
       const selection = window.getSelection();
       if (!selection.isCollapsed) {
@@ -23,11 +28,8 @@ const useClickEvents = (setTextPosition, setCurrentText, setIsEditing, inputRef)
     };
 
     document.addEventListener('click', handleClick);
-
-    return () => {
-      document.removeEventListener('click', handleClick);
-    };
-  }, [setTextPosition, setCurrentText, setIsEditing, inputRef]);
+    return () => document.removeEventListener('click', handleClick);
+  }, [setTextPosition, setCurrentText, setIsEditing, inputRef, isAudioPlaying]);
 };
 
 export default useClickEvents;

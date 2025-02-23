@@ -29,8 +29,12 @@ export function ChatProvider({ children }) {
     setMessages(prev => [...prev, message]);
   };
 
+  const clearMessages = () => {
+    setMessages([]);
+  };
+
   return (
-    <ChatContext.Provider value={{ messages, addMessage }}>
+    <ChatContext.Provider value={{ messages, addMessage, clearMessages }}>
       {children}
     </ChatContext.Provider>
   );

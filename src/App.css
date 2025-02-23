@@ -2,7 +2,7 @@
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
-  text-align: center;
+  text-align: left;  /* changed from center */
 }
 
 .logo {
@@ -67,6 +67,7 @@ body.ripple-effect::after, html.ripple-effect::after {
 }
 
 .book-container {
+  max-width: 600px;
   position: relative;
   overflow: hidden;
   background: none; /* Remove background effect inside the book container */
@@ -91,7 +92,6 @@ body.ripple-effect::after, html.ripple-effect::after {
 }
 
 .narrow-text {
-  max-width: 75%;
   margin: 0 auto;
 }
 
@@ -410,6 +410,8 @@ body.ripple-effect::after, html.ripple-effect::after {
   display: flex;
   flex-direction: column;
   padding: 15px;
+  overflow-y: auto;  /* Make content scrollable */
+  max-height: calc(100vh - 100px);  /* Limit height to viewport minus some space for tabs */
 }
 
 .notes-area {
@@ -428,7 +430,7 @@ body.ripple-effect::after, html.ripple-effect::after {
 
 .chat-messages {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: auto;  /* Make messages scrollable */
   margin-bottom: 10px;
   padding: 10px;
   display: flex;
@@ -457,7 +459,7 @@ body.ripple-effect::after, html.ripple-effect::after {
 }
 
 .chat-input {
-  width: 100%;
+  width: 87%;
   padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
@@ -633,6 +635,7 @@ body.ripple-effect::after, html.ripple-effect::after {
   padding: 12px;
   height: 100%;
   text-align: left; /* Add this line */
+  overflow-y: auto;  /* Make list scrollable */
 }
 
 .highlight-note {
@@ -820,6 +823,8 @@ body.ripple-effect::after, html.ripple-effect::after {
 
 .book-link:hover {
   background-color: rgba(0, 0, 0, 0.05);
+  color: #333;
+  border-left: 3px solid #666;
 }
 
 .book-icon {
@@ -829,21 +834,51 @@ body.ripple-effect::after, html.ripple-effect::after {
 
 .clear-button {
   position: absolute;
-  width: 80%;
-  bottom: 2rem;
-  left: 50%;
-  transform: translateX(-50%);
-  background: gray;
-  color: #fff;
+  width: 90%;
+  left: 0;
+  margin-left: 1rem;
+  transform: none;
+  background: transparent;
+  color: #666;
   border: none;
   border-radius: 4px;
-  padding: 0.7rem 1.2rem;
+  padding: 0.7rem 1rem;
   cursor: pointer;
-  font-size: 1rem;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-  transition: background 0.2s ease;
+  font-size: 0.9rem;
+  text-align: left;
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+}
+
+.clear-button.clear-texts {
+  bottom: 5rem;
+}
+
+.clear-button:not(.clear-texts) {
+  bottom: 2rem;
 }
 
 .clear-button:hover {
-  background: rgb(97, 97, 97);
+  background: rgba(0, 0, 0, 0.05);
+  color: #333;
+  border-left: 3px solid #666;
+}
+
+.narration-button {
+  display: inline-block;
+  margin: 1rem 0;
+  padding: 0.6rem 1.2rem;
+  font-size: 0.9rem;
+  color: #666;
+  background: transparent;
+  border: 2px solid #666;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.narration-button:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #333;
+  border-color: #333;
 }

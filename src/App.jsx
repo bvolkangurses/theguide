@@ -38,8 +38,51 @@ function AppContent() {
   // Add bookContainerRef
   const bookContainerRef = useRef(null);
 
+  // Replace the old handleToggleNarration with a sequential one:
+  const handleToggleNarration = async () => {
+    if (isAudioPlaying) {
+      // If audio is playing, pause it
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      setIsAudioPlaying(false);
+      setAudioUrl(null);
+      return;
+    }
+
+    const text = bookContainerRef.current?.innerText.trim();
+    if (text && text.length > 0) {
+      const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim());
+      setIsAudioPlaying(true);
+      for (const para of paragraphs) {
+        console.log("Feeding text for synthesis:", para);
+        try {
+          const response = await fetch('http://localhost:3000/synthesize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: para }),
+          });
+          if (!response.ok) {
+            console.error('Failed to fetch audio for a paragraph');
+            continue;
+          }
+          const data = await response.json();
+          if (data.audio) {
+            setAudioUrl(data.audio);
+          } else {
+            console.error('No audio data for paragraph');
+          }
+        } catch (error) {
+          console.error('Error fetching audio for paragraph:', error);
+        }
+      }
+    } else {
+      console.error("No text found in the book container");
+    }
+  };
+
   // useMouseEvents(); // Remove this hook invocation
-  useClickEvents(setTextPosition, setCurrentText, setIsInputEditing, inputRef);
+  useClickEvents(setTextPosition, setCurrentText, setIsInputEditing, inputRef, isAudioPlaying);
   const { handleTextChange, handleTextSubmit, handleKeyPress } = useTextEvents(
     setTexts, 
     currentText, 
@@ -102,12 +145,18 @@ function AppContent() {
     setHighlightedNotes([]);
   };
 
+  const handleClearTextsOnly = () => {
+    setTexts([]);
+    window.localStorage.removeItem('texts');
+  };
+
   return (
     <div className="app-container" onClick={handleOutsideClick}>
       <Sidebar 
         isOpen={isLeftSidebarOpen} 
         onClose={() => setIsLeftSidebarOpen(false)} 
-        onOpen={() => setIsLeftSidebarOpen(true)} 
+        onOpen={() => setIsLeftSidebarOpen(true)}
+        onClearTexts={handleClearTextsOnly} 
       />
 
       <Routes>
@@ -115,7 +164,7 @@ function AppContent() {
           <>
             {/* Add ref to FeynmanLectures */}
             <div ref={bookContainerRef}>
-              <FeynmanLectures />
+              <FeynmanLectures onToggleNarration={handleToggleNarration} />
             </div>
             <RightSidebar 
               isOpen={isRightSidebarOpen}
