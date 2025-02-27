@@ -34,9 +34,12 @@ const synthesizeSpeech = async (text) => {
       responseType: 'arraybuffer' // To handle binary data
     });
 
-    // Convert binary data to Base64
+    // Calculate audio duration using bitrate 192 kbps:
+    const size = response.data.length; // size in bytes
+    const duration = (size * 8) / (128 * 1000); // duration in seconds
+    
     const audioBase64 = Buffer.from(response.data, 'binary').toString('base64');
-    return `data:audio/mpeg;base64,${audioBase64}`;
+    return { audioUrl: `data:audio/mpeg;base64,${audioBase64}`, duration: duration };
   } catch (error) {
     // Improved error logging
     if (error.response && error.response.data) {
@@ -56,11 +59,6 @@ const synthesizeSpeech = async (text) => {
   }
 };
 
-// Function to split text into chunks (e.g., sentences)
-const splitTextIntoChunks = (text) => {
-  return text.match(/[^\.!\?]+[\.!\?]+/g) || [text];
-};
-
 // Function to split text into chunks (e.g., words)
 const splitTextIntoWords = (text) => {
   return text.split(/\s+/);
@@ -75,8 +73,8 @@ app.post('/synthesize', async (req, res) => {
   }
 
   try {
-    const audioUrl = await synthesizeSpeech(text);
-    res.json({ audio: audioUrl });
+    const data = await synthesizeSpeech(text);
+    res.json({ audio: data.audioUrl, duration: data.duration });
   } catch (error) {
     res.status(500).json({ error: 'Failed to synthesize speech.' });
   }

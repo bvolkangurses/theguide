@@ -1,7 +1,9 @@
 import React, { useRef, useEffect } from 'react';
-import { FaBook, FaUser, FaBars } from 'react-icons/fa';
+import { FaBook, FaUser, FaBars, FaVolumeUp } from 'react-icons/fa';
 import { Link } from "react-router-dom";
 import { useChat } from '../contexts/ChatContext';
+import { clearAudioCache } from '../utils/audioCache';
+import { clearNarrationPosition } from '../utils/narrationPositionManager';
 
 const books = [
   { id: 1, title: "The Feynman Lectures On Physics", path: "/" },
@@ -10,6 +12,12 @@ const books = [
 
 const Sidebar = ({ isOpen, onClose, onOpen, onClearTexts }) => {
   const { clearMessages } = useChat();
+
+  const handleClearAudioCache = () => {
+    clearAudioCache();
+    clearNarrationPosition(); // Also clear narration position when clearing audio cache
+    // Optional: show feedback to the user that cache was cleared
+  };
 
   const handleClear = () => {
     window.localStorage.clear();
@@ -43,7 +51,7 @@ const Sidebar = ({ isOpen, onClose, onOpen, onClearTexts }) => {
           </button>
           <button
             className="clear-button"
-            onClick={handleClear}
+            onClick={() => { handleClear(); handleClearAudioCache(); }}
           >
             Clear All Data
           </button>

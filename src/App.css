@@ -203,23 +203,6 @@ body.ripple-effect::after, html.ripple-effect::after {
   color: #2c5282;
 }
 
-.glow-stick {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%; /* Span the entire width */
-  height: 2%; /* Adjust height as needed */
-  background-color: gray;
-  /* Remove border-radius if a straight stick is preferred */
-  border-radius: 0; 
-  transition: box-shadow 0.3s ease;
-  z-index: 1000;
-}
-
-.glow-stick.glowing {
-  box-shadow: inset 0 0 20px 5px rgba(255, 175, 2, 0.8); /* Inset glow effect */
-}
-
 .sidebar {
   position: fixed;
   top: 0;
@@ -554,12 +537,76 @@ body.ripple-effect::after, html.ripple-effect::after {
   color: #2c5282;
 }
 
-.glow-stick-container {
+.audio-control-button {
+  position: relative;
+  z-index: 1002;
+  background-color: rgba(255, 255, 255, 0.9);
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.audio-control-button:hover {
+  background-color: white;
+  transform: scale(1.05);
+}
+
+.audio-control-button svg {
+  width: 16px;
+  height: 16px;
+  color: #333;
+}
+
+.narration-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin-left: 4px;
+}
+
+.audio-control-button {
   position: absolute;
+  z-index: 1002;
+  background-color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.glow-stick {
+  position: relative; /* Changed from fixed to relative */
+  bottom: 0;
+  left: 0;
+  width: 100%; /* Span the entire width */
+  height: 40px; /* Increased height */
+  background-color: gray;
+  border-radius: 0;
+  transition: box-shadow 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center; /* Center the play button */
+}
+
+.glow-stick.glowing {
+  box-shadow: inset 0 0 20px 5px rgba(255, 175, 2, 0.8); /* Inset glow effect */
+}
+
+.glow-stick-container {
+  position: fixed;
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 2px;
+  height: 40px; /* Increased height to accommodate the button */
+  z-index: 1000;
 }
 
 .sidebar-right .glow-stick {
@@ -851,11 +898,11 @@ body.ripple-effect::after, html.ripple-effect::after {
 }
 
 .clear-button.clear-texts {
-  bottom: 5rem;
+  bottom: 7rem;
 }
 
 .clear-button:not(.clear-texts) {
-  bottom: 2rem;
+  bottom: 4rem;
 }
 
 .clear-button:hover {
@@ -881,4 +928,68 @@ body.ripple-effect::after, html.ripple-effect::after {
   background: rgba(0, 0, 0, 0.05);
   color: #333;
   border-color: #333;
+}
+
+.audio-progress-container {
+  position: fixed;
+  bottom: 40px;
+  left: 0;
+  width: 100%;
+  height: 50px;
+  background: #ddd;
+  z-index: 1001;
+}
+
+.audio-progress-bar {
+  height: 100%;
+  background: gray;
+  transition: width 0.001s linear;
+}
+
+.audio-controls-group {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.audio-control-button {
+  position: relative;
+  z-index: 1002;
+  background-color: rgba(255, 255, 255, 0.75);
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.audio-control-button.main-button {
+  padding: 10px 18px;
+}
+
+.audio-control-button.skip-button {
+  padding: 10px 18px;
+  flex-direction: column;
+}
+
+.audio-control-button:hover {
+  background-color: white;
+  transform: scale(1.05);
+}
+
+.audio-control-button svg {
+  width: 14px;
+  height: 14px;
+  color: #333;
+}
+
+.audio-control-button.main-button svg {
+  width: 16px;
+  height: 16px;
 }

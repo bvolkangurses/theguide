@@ -143,7 +143,7 @@ const useTextEvents = (
                   const parsedData = JSON.parse(jsonStr);
 
                   if (parsedData.audio) {
-                    setAudioUrl(parsedData.audio); // Set the audio URL state
+                    setAudioUrl(parsedData.audio.audioUrl); // Set the audio URL state
                   } else if (parsedData.text) {
                     // Accumulate the response text
                     accumulatedResponse += parsedData.text + ' ';

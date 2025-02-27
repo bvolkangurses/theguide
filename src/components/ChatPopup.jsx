@@ -3,6 +3,24 @@ import { FaTimes, FaPaperPlane } from 'react-icons/fa';
 import { useChat } from '../contexts/ChatContext';
 import AudioPlayer from './AudioPlayer';
 
+// New helper for localStorage persistence
+const loadStoredMessages = (key, initialValue) => {
+  try {
+    const stored = window.localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : initialValue;
+  } catch (e) {
+    return initialValue;
+  }
+};
+
+const saveStoredMessages = (key, value) => {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {
+    console.error('Error saving messages:', e);
+  }
+};
+
 const ChatPopup = ({ 
   highlightedText, 
   highlightId,
@@ -10,20 +28,24 @@ const ChatPopup = ({
   messages: initialMessages,
   onChatUpdate 
 }) => {
-  const [messages, setMessages] = useState(initialMessages);
+  // Use highlight-specific key for localStorage
+  const storageKey = `chatpopup_${highlightId}`;
+  const [messages, setMessages] = useState(() => loadStoredMessages(storageKey, initialMessages));
   const [inputValue, setInputValue] = useState('');
   const [audioUrl, setAudioUrl] = useState(null);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const audioRef = useRef(null);
   const { addMessage } = useChat();
 
-  // Update parent when messages change
+  // Persist messages to localStorage on change
   useEffect(() => {
+    saveStoredMessages(storageKey, messages);
     onChatUpdate(highlightId, messages);
-  }, [messages, highlightId, onChatUpdate]);
+  }, [messages, highlightId, onChatUpdate, storageKey]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setInputValue('');
     if (!inputValue.trim()) return;
 
     const userMessage = {
@@ -70,7 +92,7 @@ const ChatPopup = ({
             try {
               const parsedData = JSON.parse(jsonStr);
               if (parsedData.audio) {
-                setAudioUrl(parsedData.audio);
+                setAudioUrl(parsedData.audio.audioUrl);
                 if (audioRef.current) {
                   audioRef.current.pause();
                 }
@@ -112,8 +134,6 @@ const ChatPopup = ({
     } catch (error) {
       console.error('Error:', error);
     }
-
-    setInputValue('');
   };
 
   return (

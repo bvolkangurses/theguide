@@ -1,10 +1,44 @@
 import React from 'react';
+import { FaPlay, FaPause, FaUndo, FaRedo } from 'react-icons/fa';
 
-const GlowStick = ({ isAudioPlaying }) => {
+const GlowStick = ({ 
+  isAudioPlaying, 
+  onToggleAudio, 
+  onSkipForward,
+  onSkipBackward 
+}) => {
   return (
-    <div
-      className={`glow-stick ${isAudioPlaying ? 'glowing' : ''}`}
-    ></div>
+    <div className="glow-stick-container">
+      <div
+        className={`glow-stick ${isAudioPlaying ? 'glowing' : ''}`}
+      >
+        <div className="audio-controls-group">
+          <button 
+            className="audio-control-button skip-button"
+            onClick={onSkipBackward}
+            aria-label="Skip backward 10 seconds"
+          >
+            <FaUndo />
+          </button>
+          
+          <button 
+            className="audio-control-button main-button"
+            onClick={onToggleAudio}
+            aria-label={isAudioPlaying ? 'Pause' : 'Play'}
+          >
+            {isAudioPlaying ? <FaPause /> : <FaPlay />}
+          </button>
+          
+          <button 
+            className="audio-control-button skip-button"
+            onClick={onSkipForward}
+            aria-label="Skip forward 10 seconds"
+          >
+            <FaRedo />
+          </button>
+        </div>
+      </div>
+    </div>
   );
 };
 

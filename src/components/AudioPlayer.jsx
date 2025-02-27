@@ -1,12 +1,19 @@
 import React, { useEffect } from 'react';
 
-const AudioPlayer = ({ audioUrl, setIsAudioPlaying, audioRef, setMainAppPlaying }) => {
+const AudioPlayer = ({ audioUrl, setIsAudioPlaying, audioRef, audioDuration, onProgress, initialTime = 0 }) => {
   useEffect(() => {
     let isCurrentAudio = true;
+    let animationFrameId;
+
+    const updateProgress = () => {
+      if (audioRef.current && audioDuration) {
+        const progress = (audioRef.current.currentTime / audioDuration) * 100;
+        onProgress(progress);
+      }
+    };
 
     const setupAudio = async () => {
       try {
-        // Clean up previous audio
         if (audioRef.current) {
           audioRef.current.pause();
           audioRef.current = null;
@@ -16,27 +23,42 @@ const AudioPlayer = ({ audioUrl, setIsAudioPlaying, audioRef, setMainAppPlaying 
 
         const audio = new Audio(audioUrl);
         
-        // Set up event listeners
-        audio.onplay = () => {
-          if (isCurrentAudio && setIsAudioPlaying && setMainAppPlaying) {
-            setIsAudioPlaying(true);
-            setMainAppPlaying(true);
+        if (initialTime > 0) {
+          audio.currentTime = initialTime;
+        }
+
+        // Add timeupdate listener to track progress
+        audio.ontimeupdate = () => {
+          if (onProgress && audioDuration) {
+            const progress = (audio.currentTime / audioDuration) * 100;
+            onProgress(progress);
           }
         };
         
-        audio.onended = audio.onpause = () => {
-          if (isCurrentAudio && setIsAudioPlaying && setMainAppPlaying) {
+        // Set up event listeners
+        audio.onplay = () => {
+          if (isCurrentAudio && setIsAudioPlaying ) {
+            setIsAudioPlaying(true);
+          }
+        };
+        
+        audio.onpause = () => {
+          if (isCurrentAudio) {
             setIsAudioPlaying(false);
-            setMainAppPlaying(false);
-            audioRef.current = null;
+            // Do not reset audioRef to preserve currentTime
+          }
+        };
+
+        audio.onended = () => {
+          if (isCurrentAudio) {
+            setIsAudioPlaying(false);
+            audioRef.current = null; // Reset on ended
           }
         };
 
         audio.onerror = () => {
-          if (isCurrentAudio && setIsAudioPlaying && setMainAppPlaying) {
-            console.error('Error playing audio');
+          if (isCurrentAudio && setIsAudioPlaying ) {
             setIsAudioPlaying(false);
-            setMainAppPlaying(false);
             audioRef.current = null;
           }
         };
@@ -44,11 +66,10 @@ const AudioPlayer = ({ audioUrl, setIsAudioPlaying, audioRef, setMainAppPlaying 
         // Set current audio before playing
         audioRef.current = audio;
         await audio.play();
+        animationFrameId = requestAnimationFrame(updateProgress);
       } catch (error) {
-        console.error('Error playing audio:', error);
-        if (isCurrentAudio && setIsAudioPlaying && setMainAppPlaying) {
+        if (isCurrentAudio && setIsAudioPlaying ) {
           setIsAudioPlaying(false);
-          setMainAppPlaying(false);
           audioRef.current = null;
         }
       }
@@ -58,12 +79,13 @@ const AudioPlayer = ({ audioUrl, setIsAudioPlaying, audioRef, setMainAppPlaying 
 
     return () => {
       isCurrentAudio = false;
+      cancelAnimationFrame(animationFrameId);
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
     };
-  }, [audioUrl, setIsAudioPlaying, setMainAppPlaying]); // Add dependencies
+  }, [audioUrl, setIsAudioPlaying, audioDuration, onProgress, initialTime]);
 
   return null;
 };
