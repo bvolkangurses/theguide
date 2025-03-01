@@ -1,5 +1,8 @@
 import { useCallback } from 'react';
 import { useChat } from '../contexts/ChatContext';
+import { useBooks } from '../contexts/BookContext';
+import { getBookIdFromPath } from '../utils/bookIdMapper';
+import { saveAudioToCache } from '../utils/audioCache';
 
 const useTextEvents = (
   setTexts, 
@@ -13,6 +16,13 @@ const useTextEvents = (
   bookContainerRef // Add this parameter
 ) => {
   const { addMessage } = useChat();
+  const { currentBook } = useBooks();
+  
+  // Determine which book-specific assistant to use
+  const bookId = getBookIdFromPath(currentBook?.path);
+  
+  // Get publication year for timestamp adjustment
+  const publicationYear = currentBook?.publicationYear || new Date().getFullYear();
 
   const handleTextChange = useCallback((e) => {
     const textarea = e.target;
@@ -31,14 +41,16 @@ const useTextEvents = (
       // Get book container rect
       const bookContainerRect = bookContainerRef.current.getBoundingClientRect();
       
-      // Add user message to chat with timestamp
+      // Add user message to chat with timestamp and current year
       const timestamp = new Date();
       const message = {
         text: currentText,
         type: 'user',
         timestamp: {
           date: timestamp.toLocaleDateString(),
-          time: timestamp.toLocaleTimeString()
+          time: timestamp.toLocaleTimeString(),
+          year: timestamp.getFullYear(),
+          bookId: bookId // Add bookId to the message for reference
         }
       };
       addMessage(message);
@@ -60,6 +72,7 @@ const useTextEvents = (
       setIsEditing(false);
 
       try {
+        
         const response = await fetch('http://localhost:3000/chat', {
           method: 'POST',
           headers: {
@@ -67,7 +80,8 @@ const useTextEvents = (
           },
           body: JSON.stringify({ 
             messages: [{ role: 'user', content: currentText }],
-            source: 'main' // Add source to identify where the request came from
+            source: 'main',
+            bookId: bookId // Include the book ID in the request
           }),
         });
 
@@ -123,15 +137,19 @@ const useTextEvents = (
               if (completeMessage.startsWith(prefix)) {
                 const jsonStr = completeMessage.replace(prefix, '').trim();
                 if (jsonStr === '[DONE]') {
-                  // Add complete response to chat when done with timestamp
+                  // Add complete response to chat when done with timestamp adjusted to publication year
                   if (accumulatedResponse) {
-                    const timestamp = new Date();
+                    const assistantDate = new Date();
+                    assistantDate.setFullYear(publicationYear);
+                    
                     const responseMessage = {
                       text: accumulatedResponse.trim(),
                       type: 'assistant',
                       timestamp: {
-                        date: timestamp.toLocaleDateString(),
-                        time: timestamp.toLocaleTimeString()
+                        date: assistantDate.toLocaleDateString(),
+                        time: assistantDate.toLocaleTimeString(),
+                        year: publicationYear,
+                        bookId: bookId // Add bookId to the message
                       }
                     };
                     addMessage(responseMessage);
@@ -143,6 +161,18 @@ const useTextEvents = (
                   const parsedData = JSON.parse(jsonStr);
 
                   if (parsedData.audio) {
+                    // Save audio with bookId for potential reuse
+                    if (parsedData.audio.audioText) {
+                      saveAudioToCache(
+                        parsedData.audio.audioText, 
+                        { 
+                          audio: parsedData.audio.audioUrl,
+                          duration: parsedData.audio.duration || 0
+                        },
+                        bookId
+                      );
+                    }
+                    
                     setAudioUrl(parsedData.audio.audioUrl); // Set the audio URL state
                   } else if (parsedData.text) {
                     // Accumulate the response text
@@ -170,7 +200,20 @@ const useTextEvents = (
         console.error('Error fetching chat:', error);
       }
     }
-  }, [setTexts, currentText, setCurrentText, setIsEditing, inputRef, textPosition, setAudioUrl, setPendingLLMText, addMessage, bookContainerRef]);
+  }, [
+    setTexts, 
+    currentText, 
+    setCurrentText, 
+    setIsEditing, 
+    inputRef, 
+    textPosition, 
+    setAudioUrl, 
+    setPendingLLMText, 
+    addMessage, 
+    bookContainerRef,
+    bookId, 
+    publicationYear // Add publicationYear to dependencies
+  ]);
 
   const handleKeyPress = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey) {

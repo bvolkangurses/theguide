@@ -5,6 +5,7 @@ import 'dotenv/config';
 import { Readable } from 'stream';
 import axios from 'axios'; // Added axios for HTTP requests
 import { PassThrough } from 'stream'; // Import PassThrough for streaming
+import { getBookMetadataById, DEFAULT_BOOKS_METADATA } from './src/utils/serverBookMetadata.js';
 
 const app = express();
 
@@ -13,14 +14,13 @@ app.use(express.json());
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Load ElevenLabs API credentials from environment variables
+// Load ElevenLabs API key from environment variables
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
-const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID;
 
-// Function to synthesize speech using ElevenLabs API
-const synthesizeSpeech = async (text) => {
+// Function to synthesize speech using ElevenLabs API with dynamic voice ID
+const synthesizeSpeech = async (text, voiceId) => {
   try {
-    const response = await axios.post(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
+    const response = await axios.post(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       text: text,
       voice_settings: {
         stability: 0.75, // Adjust stability as needed
@@ -66,28 +66,57 @@ const splitTextIntoWords = (text) => {
 
 // /synthesize endpoint to handle text-to-speech requests
 app.post('/synthesize', async (req, res) => {
-  const { text } = req.body;
+  const { text, bookId } = req.body;
   
   if (!text) {
     return res.status(400).json({ error: 'No text provided for synthesis.' });
   }
 
   try {
-    const data = await synthesizeSpeech(text);
+    // Get the appropriate voice ID for the book
+    const bookMetadata = getBookMetadataById(bookId);
+    const voiceId = bookMetadata?.authorVoiceID || process.env.ELEVENLABS_VOICE_ID; // Fallback to env var
+    
+    const data = await synthesizeSpeech(text, voiceId);
     res.json({ audio: data.audioUrl, duration: data.duration });
   } catch (error) {
     res.status(500).json({ error: 'Failed to synthesize speech.' });
   }
 });
 
-// /chat endpoint to handle text requests, audio synthesis, and stream text words
+// Modified /chat endpoint with better debugging and error handling for bookId
 app.post('/chat', async (req, res) => {
-  const { messages } = req.body; // messages: Array of {role, content}
+  
+  // Handle both possible locations for bookId (top level and nested)
+  let bookId = req.body.bookId;
+  
+  // Ensure bookId is a string and use default if not present
+  if (!bookId || typeof bookId !== 'string') {
+    console.log("Invalid or missing bookId, using default");
+    bookId = "1"; // Use Feynman as default (ID: "1")
+  }
+  
+  console.log("Final bookId being used:", bookId);
+  
+  const { messages } = req.body;
+  
   try {
-    // Add a system message with instructions for the LLM
+    // Get book metadata including system prompt and voice ID
+    const bookMetadata = getBookMetadataById(bookId);
+    
+    if (!bookMetadata) {
+      console.log("WARNING: Could not find book metadata for ID:", bookId);
+      console.log("Available books:", DEFAULT_BOOKS_METADATA.map(b => ({ id: b.id, title: b.title })));
+    }
+    
+    // Use book-specific system prompt or fallback to default
+    const systemPrompt = bookMetadata?.systemPrompt || 
+      "You are a helpful assistant explaining concepts from the book. Keep responses to less than 100 words.";
+    
+    // Add a system message with instructions specific to this book
     const systemMessage = {
       role: 'system',
-      content: 'You are Richard Feynman, a physicist who loves to explain complex concepts in simple terms. You are talking to a reader who is reading Feynman lectures on Physics. They might ask you questions about it or physics in general. Respond accordingly but keep Richard Feynmans joyful quirky tone. Keep your responses to less than 100 words.',
+      content: systemPrompt
     };
     
     // Prepend the system message to the existing messages
@@ -102,10 +131,11 @@ app.post('/chat', async (req, res) => {
     const reply = chatCompletion.choices[0].message.content;
     const words = splitTextIntoWords(reply);
 
-    // Request audio synthesis
+    // Request audio synthesis with book-specific voice ID
     let audioUrl = '';
     try {
-      const audioResponse = await synthesizeSpeech(reply);
+      const voiceId = bookMetadata?.authorVoiceID || process.env.ELEVENLABS_VOICE_ID;
+      const audioResponse = await synthesizeSpeech(reply, voiceId);
       audioUrl = audioResponse; // `synthesizeSpeech` returns the audio URL
     } catch (synthError) {
       console.error('Audio synthesis failed:', synthError);

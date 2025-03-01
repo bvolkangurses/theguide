@@ -1,21 +1,21 @@
 import React, { useEffect } from 'react';
 import { useBooks } from '../contexts/BookContext';
 
-const FeynmanLectures = ({ onToggleNarration, isAudioPlaying }) => {
+const NineteenEightyFour = ({ onToggleNarration, isAudioPlaying }) => {
   const { setCurrentBookByPath } = useBooks();
 
   // Set current book when component mounts
   useEffect(() => {
-    setCurrentBookByPath('/');
+    setCurrentBookByPath('/1984');
   }, [setCurrentBookByPath]);
 
   return (
     <div className="book-page">
       <div className="book-container">
-        <h1 className='h1' style={{ textAlign: 'center' }}>The Feynman Lectures On Physics</h1>
+        <h1 className='h1' style={{ textAlign: 'center' }}>1984</h1>
         <div className="book-content narrow-text scrollable">
           <div id="Ch1-S1-p1" className="para">
-            <p className="p">This two-year course in physics</p>
+            <p className="p">It was a bright cold day in April</p>
           </div>
         </div>
       </div>
@@ -23,4 +23,4 @@ const FeynmanLectures = ({ onToggleNarration, isAudioPlaying }) => {
   );
 };
 
-export default FeynmanLectures;
+export default NineteenEightyFour;

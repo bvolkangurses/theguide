@@ -12,15 +12,49 @@ const useSelectionEvents = (onHighlightAdd, onHighlightRemove) => {
       const highlightId = Date.now().toString();
       span.className = 'highlighted-text';
       span.dataset.highlightId = highlightId;
-      range.surroundContents(span);
       
-      // Add highlighted text to notes
-      const highlightedText = range.toString();
+      // Store text nodes for path information
+      const container = range.commonAncestorContainer;
+      const bookContainer = document.querySelector('.book-container');
+      
+      // Find the parent paragraph or element containing the highlight
+      let parentParagraph = range.startContainer;
+      while (parentParagraph && parentParagraph.nodeName !== 'P' && parentParagraph !== bookContainer) {
+        parentParagraph = parentParagraph.parentNode;
+      }
+      
+      // Find index of the paragraph in the book
+      const allParagraphs = Array.from(bookContainer.querySelectorAll('p'));
+      const paragraphIndex = parentParagraph ? allParagraphs.indexOf(parentParagraph) : -1;
+      
+      // Get start and end offsets in the paragraph
+      const highlightText = range.toString();
+      const paragraphText = parentParagraph ? parentParagraph.textContent : '';
+      const textStartIndex = paragraphText.indexOf(highlightText);
+      
+      // Surround selected content with the highlight span
+      try {
+        range.surroundContents(span);
+      } catch (e) {
+        console.error('Could not surround range, it might cross element boundaries:', e);
+        // Fall back to simpler highlighting
+        const text = range.extractContents();
+        span.appendChild(text);
+        range.insertNode(span);
+      }
+      
+      // Add highlighted text to notes with position info
       const timestamp = new Date();
       onHighlightAdd({
         id: highlightId,
-        text: highlightedText,
+        text: highlightText,
         timestamp: timestamp.toLocaleString(),
+        path: {
+          paragraphIndex,
+          textStartIndex,
+          textEndIndex: textStartIndex + highlightText.length,
+          paragraphText: paragraphText // Store the full paragraph text for context
+        }
       });
 
       setSelection(null);

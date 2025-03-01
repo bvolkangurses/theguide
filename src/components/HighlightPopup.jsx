@@ -1,7 +1,7 @@
 import React from 'react';
-import { FaHighlighter, FaTrash } from 'react-icons/fa';
+import { FaHighlighter, FaTrash, FaComments } from 'react-icons/fa';
 
-const HighlightPopup = ({ position, onHighlight, onRemove, isEditing }) => {
+const HighlightPopup = ({ position, onHighlight, onRemove, onOpenChat, isEditing }) => {
   return (
     <div 
       className="highlight-popup"
@@ -15,9 +15,16 @@ const HighlightPopup = ({ position, onHighlight, onRemove, isEditing }) => {
           <FaHighlighter /> Highlight
         </button>
       ) : (
-        <button onClick={onRemove} className="highlight-btn delete">
-          <FaTrash /> Remove
-        </button>
+        <>
+          <button onClick={onRemove} className="highlight-btn delete">
+            <FaTrash /> Remove
+          </button>
+          {onOpenChat && (
+            <button onClick={onOpenChat} className="highlight-btn chat">
+              <FaComments /> Chat
+            </button>
+          )}
+        </>
       )}
     </div>
   );

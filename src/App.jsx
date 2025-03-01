@@ -1,10 +1,12 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { ChatProvider, useChat } from './contexts/ChatContext';
+import { BookProvider, useBooks } from './contexts/BookContext'; // Add useBooks to the import
 import './App.css';
 import TextInput from './components/TextInput';
 import TextDisplay from './components/TextDisplay';
 import GlowStick from './components/GlowStick';
 import FeynmanLectures from './pages/FeynmanLectures';
+import OriginOfSpecies from './pages/OriginOfSpecies'; // Add this import
 import AudioPlayer from './components/AudioPlayer';
 import AudioPlayerMain from './components/AudioPlayerMain';
 import Sidebar from './components/Sidebar';
@@ -16,16 +18,29 @@ import useTextEvents from './hooks/useTextEvents';
 import useEffectHooks from './hooks/useEffectHooks';
 import useSelectionEvents from './hooks/useSelectionEvents'; // Add this import
 import { FaBook, FaUser, FaTimes, FaBars } from 'react-icons/fa'; // Ensure these imports are present
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom"; // Updated imports
-import useLocalStorage from './hooks/useLocalStorage';
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import useLocalStorage, { useBookStorage } from './hooks/useLocalStorage'; // Fix this import
 import AudioProgressBar from './components/AudioProgressBar';
-import { saveAudioToCache, getAudioFromCache, cleanupAudioCache, clearAudioCache } from './utils/audioCache';
+import { saveAudioToCache, getAudioFromCache, cleanupAudioCache, clearBookAudioCache } from './utils/audioCache';
 import { saveNarrationPosition, loadNarrationPosition, clearNarrationPosition } from './utils/narrationPositionManager';
+import { getBookIdFromPath } from './utils/bookIdMapper';
+import { getBookSpecificKey } from './utils/storageKeyManager';
+import { restoreHighlights } from './utils/highlightUtils';
+import TextAudioSynthesis from './services/TextAudioSynthesis';
+import NineteenEightyFour from './pages/NineteenEightyFour';
+import MurderOrientExpress from './pages/MurderOrientExpress';
+import HarryPotter from './pages/HarryPotter';
+import BriefHistoryOfTime from './pages/BriefHistoryOfTime';
 
 function AppContent() {
-  // Replace useState with useLocalStorage for persistent states
-  const [texts, setTexts] = useLocalStorage('texts', []);
-  const [highlightedNotes, setHighlightedNotes] = useLocalStorage('highlightedNotes', []);
+  const { currentBook } = useBooks();
+  const bookId = getBookIdFromPath(currentBook?.path);
+  
+  // Use book-specific storage with our new hook
+  const [texts, setTexts] = useBookStorage('texts', bookId, []);
+  const [highlightedNotes, setHighlightedNotes] = useBookStorage('highlightedNotes', bookId, []);
+  const [highlightChats, setHighlightChats] = useBookStorage('highlightChats', bookId, {});
+  
   const [currentText, setCurrentText] = useState('');
   const [textPosition, setTextPosition] = useState({ x: 0, y: 0, maxWidth: 0 });
   const [isInputEditing, setIsInputEditing] = useState(false); // Rename for clarity
@@ -34,7 +49,6 @@ function AppContent() {
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(false); // Update state
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false); // Add state
   const [isMainAppPlaying, setIsMainAppPlaying] = useState(false);
-  const [highlightChats, setHighlightChats] = useState({});
 
   // Add bookContainerRef
   const bookContainerRef = useRef(null);
@@ -82,13 +96,14 @@ function AppContent() {
         paragraphText: paragraphsMain[currentParagraphIndexMain]
       };
       
-      saveNarrationPosition(position);
+      saveNarrationPosition(position, bookId); // Pass bookId
     }
   }, [
     currentParagraphIndexMain, 
     isAudioPlayingMain,
     // We use audioProgressMain as a proxy for time changes
-    audioProgressMain
+    audioProgressMain,
+    bookId // Add bookId as a dependency
   ]);
   
   // Periodically save position (every 5 seconds) when playing
@@ -103,14 +118,14 @@ function AppContent() {
           paragraphText: paragraphsMain[currentParagraphIndexMain]
         };
         
-        saveNarrationPosition(position);
+        saveNarrationPosition(position, bookId); // Pass bookId
       }, 5000); // Save every 5 seconds
     }
     
     return () => {
       if (saveInterval) clearInterval(saveInterval);
     };
-  }, [isAudioPlayingMain, currentParagraphIndexMain, paragraphsMain]);
+  }, [isAudioPlayingMain, currentParagraphIndexMain, paragraphsMain, bookId]);
 
   // Handler for audio ended event - extract this from the useEffect
   const handleAudioEndedMain = useCallback(async () => {
@@ -140,7 +155,7 @@ function AppContent() {
           
           // Check cache first
           const paragraphText = paragraphsMain[nextIndex];
-          const cachedAudio = getAudioFromCache(paragraphText);
+          const cachedAudio = getAudioFromCache(paragraphText, bookId);
           
           if (cachedAudio) {
             // Use cached audio if available
@@ -153,7 +168,10 @@ function AppContent() {
             const response = await fetch('http://localhost:3000/synthesize', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text: paragraphText }),
+              body: JSON.stringify({ 
+                text: paragraphText,
+                bookId: bookId // Add bookId to use the appropriate voice
+              }),
             });
             
             if (!response.ok) {
@@ -164,7 +182,7 @@ function AppContent() {
             const data = await response.json();
             if (data.audio && data.duration) {
               // Save to cache before using
-              saveAudioToCache(paragraphText, data);
+              saveAudioToCache(paragraphText, data, bookId);
               
               setAudioUrlMain(data.audio);
               setAudioDurationMain(data.duration);
@@ -182,7 +200,7 @@ function AppContent() {
       // At end of all paragraphs
       setIsAudioPlayingMain(false);
     }
-  }, [currentParagraphIndexMain, paragraphsMain, nextAudioUrlMain, nextAudioDurationMain]);
+  }, [currentParagraphIndexMain, paragraphsMain, nextAudioUrlMain, nextAudioDurationMain, bookId]);
 
   // Effect to monitor progress and preload next paragraph
   useEffect(() => {
@@ -196,7 +214,7 @@ function AppContent() {
         const paragraphText = paragraphsMain[nextIndex];
         
         // Check cache first for preloading
-        const cachedAudio = getAudioFromCache(paragraphText);
+        const cachedAudio = getAudioFromCache(paragraphText, bookId);
         
         if (cachedAudio) {
           // Use cached audio if available
@@ -207,7 +225,10 @@ function AppContent() {
           const response = await fetch('http://localhost:3000/synthesize', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: paragraphText }),
+            body: JSON.stringify({ 
+              text: paragraphText,
+              bookId: bookId // Add bookId to use the appropriate voice
+            }),
           });
           
           if (!response.ok) {
@@ -217,7 +238,7 @@ function AppContent() {
           const data = await response.json();
           if (data.audio && data.duration) {
             // Save to cache before using
-            saveAudioToCache(paragraphText, data);
+            saveAudioToCache(paragraphText, data, bookId);
             
             setNextAudioUrlMain(data.audio);
             setNextAudioDurationMain(data.duration);
@@ -234,7 +255,38 @@ function AppContent() {
     if (isAudioPlayingMain && audioProgressMain >= 75 && !isPreloadingMain && !nextAudioUrlMain) {
       preloadNextParagraph();
     }
-  }, [audioProgressMain, isAudioPlayingMain, paragraphsMain, currentParagraphIndexMain, isPreloadingMain, nextAudioUrlMain]);
+  }, [audioProgressMain, isAudioPlayingMain, paragraphsMain, currentParagraphIndexMain, isPreloadingMain, nextAudioUrlMain, bookId]);
+
+  // Add effect to reset audio state when book changes
+  useEffect(() => {
+    // Reset audio states when book changes
+    setAudioUrlMain(null);
+    setAudioDurationMain(0);
+    setIsAudioPlayingMain(false);
+    setAudioProgressMain(0);
+    setParagraphsMain([]);
+    setCurrentParagraphIndexMain(0);
+    setNextAudioUrlMain(null);
+    setNextAudioDurationMain(0);
+    setIsPreloadingMain(false);
+    setIsWaitingForNextParagraphMain(false);
+    setShowProgressBarMain(false);
+    
+    // Reset main audio player
+    if (audioRefMain.current) {
+      audioRefMain.current.pause();
+      audioRefMain.current = null;
+    }
+    
+    // Reset chat audio player
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setAudioUrl(null);
+    setIsAudioPlaying(false);
+    
+  }, [bookId]); // Only run when bookId changes
 
   // Replace the old handleToggleNarration with a sequential one:
   const handleToggleNarrationMain = async () => {
@@ -263,7 +315,7 @@ function AppContent() {
       setParagraphsMain(allParagraphs);
       
       // Try to restore saved position
-      const savedPosition = loadNarrationPosition();
+      const savedPosition = loadNarrationPosition(bookId);
       let startParagraphIndex = 0;
       let startTimePosition = 0;
       
@@ -289,7 +341,7 @@ function AppContent() {
         
         try {
           // Check cache first
-          const cachedAudio = getAudioFromCache(paragraphText);
+          const cachedAudio = getAudioFromCache(paragraphText, bookId);
           
           if (cachedAudio) {
             // Use cached audio if available
@@ -307,7 +359,10 @@ function AppContent() {
             const response = await fetch('http://localhost:3000/synthesize', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text: paragraphText }),
+              body: JSON.stringify({ 
+                text: paragraphText,
+                bookId: bookId // Add bookId to use the appropriate voice
+              }),
             });
             
             if (!response.ok) {
@@ -317,7 +372,7 @@ function AppContent() {
             const data = await response.json();
             if (data.audio && data.duration) {
               // Save to cache before using
-              saveAudioToCache(paragraphText, data);
+              saveAudioToCache(paragraphText, data, bookId);
               
               setAudioUrlMain(data.audio);
               setAudioDurationMain(data.duration);
@@ -417,15 +472,28 @@ function AppContent() {
 
   const handleClear = () => {
     localStorage.clear();
-    clearNarrationPosition(); // Clear narration position
+    clearNarrationPosition(bookId); // Clear specific book's narration position
+    clearBookAudioCache(bookId);
     setTexts([]);
     setHighlightedNotes([]);
+    setHighlightChats({});
   };
 
   const handleClearTextsOnly = () => {
     setTexts([]);
-    window.localStorage.removeItem('texts');
+    // Just remove the current book's texts
+    localStorage.removeItem(getBookSpecificKey('texts', bookId));
   };
+
+  // Restore highlights when component mounts or book changes
+  useEffect(() => {
+    // Wait a bit to ensure the book content is fully rendered
+    const timer = setTimeout(() => {
+      restoreHighlights(highlightedNotes, bookContainerRef);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [highlightedNotes, bookId, bookContainerRef]);
 
   return (
     <div className="app-container" onClick={handleOutsideClick}>
@@ -509,6 +577,352 @@ function AppContent() {
             )}
           </>
         } />
+        <Route path="/origin-of-species" element={
+          <>
+            <div ref={bookContainerRef}>
+              <OriginOfSpecies 
+                onToggleNarration={handleToggleNarrationMain}
+                isAudioPlaying={isAudioPlayingMain}
+              />
+            </div>
+            <RightSidebar 
+              isOpen={isRightSidebarOpen}
+              onClose={() => setIsRightSidebarOpen(false)}
+              onOpen={() => setIsRightSidebarOpen(true)}
+              isMainAppPlaying={isMainAppPlaying}
+              highlightedNotes={highlightedNotes}
+              defaultTab="notes"
+              highlightChats={highlightChats}
+              onChatUpdate={handleChatUpdate}
+            />
+            <TextDisplay texts={texts} onClear={handleClearTextsOnly} />
+            {isInputEditing && (
+              <TextInput
+                textPosition={textPosition}
+                currentText={currentText}
+                setCurrentText={setCurrentText}
+                handleTextChange={handleTextChange}
+                handleKeyPress={handleKeyPress}
+                inputRef={inputRef}
+              />
+            )}
+            {/* Conditionally render AudioProgressBar */}
+            <AudioProgressBar 
+              isAudioPlaying={isAudioPlayingMain}
+              audioDuration={audioDurationMain}
+              audioProgress={audioProgressMain}
+              audioRef={audioRefMain}
+            />
+            <GlowStick 
+              isAudioPlaying={isAudioPlayingMain || isAudioPlaying} 
+              onToggleAudio={handleToggleNarrationMain}
+              onSkipForward={handleSkipForward}
+              onSkipBackward={handleSkipBackward}
+            />
+            <AudioPlayerMain
+              audioUrl={audioUrlMain}
+              setIsAudioPlaying={setIsAudioPlayingMain}
+              audioRef={audioRefMain}
+              setMainAppPlaying={setIsMainAppPlaying}
+              audioDuration={audioDurationMain}
+              onProgress={setAudioProgressMain}
+              onAudioEnded={handleAudioEndedMain}
+              isWaitingForNextParagraph={isWaitingForNextParagraphMain}
+              enableProgressTracking={showProgressBarMain}
+            />
+            <AudioPlayer
+              audioUrl={audioUrl}
+              setIsAudioPlaying={setIsAudioPlaying}
+              audioRef={audioRef}
+            />
+            {popupPosition && (
+              <HighlightPopup
+                position={popupPosition}
+                onHighlight={handleHighlight}
+                onRemove={handleRemoveHighlight}
+                onEdit={handleEditHighlight}
+                isEditing={isHighlightEditing}
+              />
+            )}
+          </>
+        } />
+        <Route path="/murder-on-the-orient-express" element={
+          <>
+            <div ref={bookContainerRef}>
+              <MurderOrientExpress 
+                onToggleNarration={handleToggleNarrationMain}
+                isAudioPlaying={isAudioPlayingMain}
+              />
+            </div>
+            <RightSidebar 
+              isOpen={isRightSidebarOpen}
+              onClose={() => setIsRightSidebarOpen(false)}
+              onOpen={() => setIsRightSidebarOpen(true)}
+              isMainAppPlaying={isMainAppPlaying}
+              highlightedNotes={highlightedNotes}
+              defaultTab="notes"
+              highlightChats={highlightChats}
+              onChatUpdate={handleChatUpdate}
+            />
+            {/* Same UI components as other routes */}
+            <TextDisplay texts={texts} />
+            {isInputEditing && (
+              <TextInput
+                textPosition={textPosition}
+                currentText={currentText}
+                setCurrentText={setCurrentText}
+                handleTextChange={handleTextChange}
+                handleKeyPress={handleKeyPress}
+                inputRef={inputRef}
+              />
+            )}
+            <AudioProgressBar 
+              isAudioPlaying={isAudioPlayingMain}
+              audioDuration={audioDurationMain}
+              audioProgress={audioProgressMain}
+              audioRef={audioRefMain}
+            />
+            <GlowStick 
+              isAudioPlaying={isAudioPlayingMain || isAudioPlaying} 
+              onToggleAudio={handleToggleNarrationMain}
+              onSkipForward={handleSkipForward}
+              onSkipBackward={handleSkipBackward}
+            />
+            <AudioPlayerMain
+              audioUrl={audioUrlMain}
+              setIsAudioPlaying={setIsAudioPlayingMain}
+              audioRef={audioRefMain}
+              setMainAppPlaying={setIsMainAppPlaying}
+              audioDuration={audioDurationMain}
+              onProgress={setAudioProgressMain}
+              onAudioEnded={handleAudioEndedMain}
+              isWaitingForNextParagraph={isWaitingForNextParagraphMain}
+              enableProgressTracking={showProgressBarMain}
+            />
+            <AudioPlayer
+              audioUrl={audioUrl}
+              setIsAudioPlaying={setIsAudioPlaying}
+              audioRef={audioRef}
+            />
+            {popupPosition && (
+              <HighlightPopup
+                position={popupPosition}
+                onHighlight={handleHighlight}
+                onRemove={handleRemoveHighlight}
+                onEdit={handleEditHighlight}
+                isEditing={isHighlightEditing}
+              />
+            )}
+          </>
+        } />
+        
+        <Route path="/1984" element={
+          <>
+            <div ref={bookContainerRef}>
+              <NineteenEightyFour 
+                onToggleNarration={handleToggleNarrationMain}
+                isAudioPlaying={isAudioPlayingMain}
+              />
+            </div>
+            <RightSidebar 
+              isOpen={isRightSidebarOpen}
+              onClose={() => setIsRightSidebarOpen(false)}
+              onOpen={() => setIsRightSidebarOpen(true)}
+              isMainAppPlaying={isMainAppPlaying}
+              highlightedNotes={highlightedNotes}
+              defaultTab="notes"
+              highlightChats={highlightChats}
+              onChatUpdate={handleChatUpdate}
+            />
+            {/* Rest of UI components same as other routes */}
+            <TextDisplay texts={texts} />
+            {isInputEditing && (
+              <TextInput
+                textPosition={textPosition}
+                currentText={currentText}
+                setCurrentText={setCurrentText}
+                handleTextChange={handleTextChange}
+                handleKeyPress={handleKeyPress}
+                inputRef={inputRef}
+              />
+            )}
+            <AudioProgressBar 
+              isAudioPlaying={isAudioPlayingMain}
+              audioDuration={audioDurationMain}
+              audioProgress={audioProgressMain}
+              audioRef={audioRefMain}
+            />
+            <GlowStick 
+              isAudioPlaying={isAudioPlayingMain || isAudioPlaying} 
+              onToggleAudio={handleToggleNarrationMain}
+              onSkipForward={handleSkipForward}
+              onSkipBackward={handleSkipBackward}
+            />
+            <AudioPlayerMain
+              audioUrl={audioUrlMain}
+              setIsAudioPlaying={setIsAudioPlayingMain}
+              audioRef={audioRefMain}
+              setMainAppPlaying={setIsMainAppPlaying}
+              audioDuration={audioDurationMain}
+              onProgress={setAudioProgressMain}
+              onAudioEnded={handleAudioEndedMain}
+              isWaitingForNextParagraph={isWaitingForNextParagraphMain}
+              enableProgressTracking={showProgressBarMain}
+            />
+            <AudioPlayer
+              audioUrl={audioUrl}
+              setIsAudioPlaying={setIsAudioPlaying}
+              audioRef={audioRef}
+            />
+            {popupPosition && (
+              <HighlightPopup
+                position={popupPosition}
+                onHighlight={handleHighlight}
+                onRemove={handleRemoveHighlight}
+                onEdit={handleEditHighlight}
+                isEditing={isHighlightEditing}
+              />
+            )}
+          </>
+        } />
+        <Route path="/harry-potter" element={
+          <>
+            <div ref={bookContainerRef}>
+              <HarryPotter 
+                onToggleNarration={handleToggleNarrationMain}
+                isAudioPlaying={isAudioPlayingMain}
+              />
+            </div>
+            <RightSidebar 
+              isOpen={isRightSidebarOpen}
+              onClose={() => setIsRightSidebarOpen(false)}
+              onOpen={() => setIsRightSidebarOpen(true)}
+              isMainAppPlaying={isMainAppPlaying}
+              highlightedNotes={highlightedNotes}
+              defaultTab="notes"
+              highlightChats={highlightChats}
+              onChatUpdate={handleChatUpdate}
+            />
+            {/* Standard UI components - same as other routes */}
+            <TextDisplay texts={texts} />
+            {isInputEditing && (
+              <TextInput
+                textPosition={textPosition}
+                currentText={currentText}
+                setCurrentText={setCurrentText}
+                handleTextChange={handleTextChange}
+                handleKeyPress={handleKeyPress}
+                inputRef={inputRef}
+              />
+            )}
+            <AudioProgressBar 
+              isAudioPlaying={isAudioPlayingMain}
+              audioDuration={audioDurationMain}
+              audioProgress={audioProgressMain}
+              audioRef={audioRefMain}
+            />
+            <GlowStick 
+              isAudioPlaying={isAudioPlayingMain || isAudioPlaying} 
+              onToggleAudio={handleToggleNarrationMain}
+              onSkipForward={handleSkipForward}
+              onSkipBackward={handleSkipBackward}
+            />
+            <AudioPlayerMain
+              audioUrl={audioUrlMain}
+              setIsAudioPlaying={setIsAudioPlayingMain}
+              audioRef={audioRefMain}
+              setMainAppPlaying={setIsMainAppPlaying}
+              audioDuration={audioDurationMain}
+              onProgress={setAudioProgressMain}
+              onAudioEnded={handleAudioEndedMain}
+              isWaitingForNextParagraph={isWaitingForNextParagraphMain}
+              enableProgressTracking={showProgressBarMain}
+            />
+            <AudioPlayer
+              audioUrl={audioUrl}
+              setIsAudioPlaying={setIsAudioPlaying}
+              audioRef={audioRef}
+            />
+            {popupPosition && (
+              <HighlightPopup
+                position={popupPosition}
+                onHighlight={handleHighlight}
+                onRemove={handleRemoveHighlight}
+                onEdit={handleEditHighlight}
+                isEditing={isHighlightEditing}
+              />
+            )}
+          </>
+        } />
+        <Route path="/brief-history-of-time" element={
+          <>
+            <div ref={bookContainerRef}>
+              <BriefHistoryOfTime 
+                onToggleNarration={handleToggleNarrationMain}
+                isAudioPlaying={isAudioPlayingMain}
+              />
+            </div>
+            <RightSidebar 
+              isOpen={isRightSidebarOpen}
+              onClose={() => setIsRightSidebarOpen(false)}
+              onOpen={() => setIsRightSidebarOpen(true)}
+              isMainAppPlaying={isMainAppPlaying}
+              highlightedNotes={highlightedNotes}
+              defaultTab="notes"
+              highlightChats={highlightChats}
+              onChatUpdate={handleChatUpdate}
+            />
+            {/* Standard UI components - same as other routes */}
+            <TextDisplay texts={texts} />
+            {isInputEditing && (
+              <TextInput
+                textPosition={textPosition}
+                currentText={currentText}
+                setCurrentText={setCurrentText}
+                handleTextChange={handleTextChange}
+                handleKeyPress={handleKeyPress}
+                inputRef={inputRef}
+              />
+            )}
+            <AudioProgressBar 
+              isAudioPlaying={isAudioPlayingMain}
+              audioDuration={audioDurationMain}
+              audioProgress={audioProgressMain}
+              audioRef={audioRefMain}
+            />
+            <GlowStick 
+              isAudioPlaying={isAudioPlayingMain || isAudioPlaying} 
+              onToggleAudio={handleToggleNarrationMain}
+              onSkipForward={handleSkipForward}
+              onSkipBackward={handleSkipBackward}
+            />
+            <AudioPlayerMain
+              audioUrl={audioUrlMain}
+              setIsAudioPlaying={setIsAudioPlayingMain}
+              audioRef={audioRefMain}
+              setMainAppPlaying={setIsMainAppPlaying}
+              audioDuration={audioDurationMain}
+              onProgress={setAudioProgressMain}
+              onAudioEnded={handleAudioEndedMain}
+              isWaitingForNextParagraph={isWaitingForNextParagraphMain}
+              enableProgressTracking={showProgressBarMain}
+            />
+            <AudioPlayer
+              audioUrl={audioUrl}
+              setIsAudioPlaying={setIsAudioPlaying}
+              audioRef={audioRef}
+            />
+            {popupPosition && (
+              <HighlightPopup
+                position={popupPosition}
+                onHighlight={handleHighlight}
+                onRemove={handleRemoveHighlight}
+                onEdit={handleEditHighlight}
+                isEditing={isHighlightEditing}
+              />
+            )}
+          </>
+        } />
       </Routes>
     </div>
   );
@@ -518,9 +932,11 @@ function AppContent() {
 function App() {
   return (
     <Router>
-      <ChatProvider>
-        <AppContent />
-      </ChatProvider>
+      <BookProvider>
+        <ChatProvider>
+          <AppContent />
+        </ChatProvider>
+      </BookProvider>
     </Router>
   );
 }

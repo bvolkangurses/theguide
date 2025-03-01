@@ -1,21 +1,27 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FaTimes, FaPaperPlane } from 'react-icons/fa';
 import { useChat } from '../contexts/ChatContext';
+import { useBooks } from '../contexts/BookContext';
 import AudioPlayer from './AudioPlayer';
+import { getBookIdFromPath } from '../utils/bookIdMapper';
+import { getBookSpecificKey } from '../utils/storageKeyManager';
+import { saveAudioToCache } from '../utils/audioCache';
 
-// New helper for localStorage persistence
-const loadStoredMessages = (key, initialValue) => {
+// New helper for localStorage persistence with book ID
+const loadStoredMessages = (key, bookId, initialValue) => {
   try {
-    const stored = window.localStorage.getItem(key);
+    const storageKey = getBookSpecificKey(key, bookId);
+    const stored = window.localStorage.getItem(storageKey);
     return stored ? JSON.parse(stored) : initialValue;
   } catch (e) {
     return initialValue;
   }
 };
 
-const saveStoredMessages = (key, value) => {
+const saveStoredMessages = (key, bookId, value) => {
   try {
-    window.localStorage.setItem(key, JSON.stringify(value));
+    const storageKey = getBookSpecificKey(key, bookId);
+    window.localStorage.setItem(storageKey, JSON.stringify(value));
   } catch (e) {
     console.error('Error saving messages:', e);
   }
@@ -28,20 +34,23 @@ const ChatPopup = ({
   messages: initialMessages,
   onChatUpdate 
 }) => {
-  // Use highlight-specific key for localStorage
+  const { currentBook } = useBooks();
+  const bookId = getBookIdFromPath(currentBook?.path);
+  
+  // Use highlight and book specific key for localStorage
   const storageKey = `chatpopup_${highlightId}`;
-  const [messages, setMessages] = useState(() => loadStoredMessages(storageKey, initialMessages));
+  const [messages, setMessages] = useState(() => loadStoredMessages(storageKey, bookId, initialMessages));
   const [inputValue, setInputValue] = useState('');
   const [audioUrl, setAudioUrl] = useState(null);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const audioRef = useRef(null);
   const { addMessage } = useChat();
 
-  // Persist messages to localStorage on change
+  // Persist messages to localStorage on change with book ID
   useEffect(() => {
-    saveStoredMessages(storageKey, messages);
+    saveStoredMessages(storageKey, bookId, messages);
     onChatUpdate(highlightId, messages);
-  }, [messages, highlightId, onChatUpdate, storageKey]);
+  }, [messages, highlightId, onChatUpdate, storageKey, bookId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -51,7 +60,8 @@ const ChatPopup = ({
     const userMessage = {
       text: inputValue,
       type: 'user',
-      timestamp: new Date().toLocaleString()
+      timestamp: new Date().toLocaleString(),
+      bookId: bookId // Add book ID to the message
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -64,7 +74,8 @@ const ChatPopup = ({
           messages: [{
             role: 'user',
             content: `Regarding this text: "${highlightedText}"\n\n${inputValue}`
-          }]
+          }],
+          bookId: bookId // Pass bookId to ensure correct voice
         }),
       });
 
@@ -92,6 +103,18 @@ const ChatPopup = ({
             try {
               const parsedData = JSON.parse(jsonStr);
               if (parsedData.audio) {
+                // Save audio with bookId for reuse
+                if (parsedData.audio.audioText) {
+                  saveAudioToCache(
+                    parsedData.audio.audioText, 
+                    { 
+                      audio: parsedData.audio.audioUrl,
+                      duration: parsedData.audio.duration || 0
+                    },
+                    bookId
+                  );
+                }
+                
                 setAudioUrl(parsedData.audio.audioUrl);
                 if (audioRef.current) {
                   audioRef.current.pause();
@@ -126,7 +149,8 @@ const ChatPopup = ({
         const assistantMessage = {
           text: accumulatedResponse.trim(),
           type: 'assistant',
-          timestamp: new Date().toLocaleString()
+          timestamp: new Date().toLocaleString(),
+          bookId: bookId // Add book ID to the message
         };
         setMessages(prev => [...prev, assistantMessage]);
       }

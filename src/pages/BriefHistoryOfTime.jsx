@@ -1,21 +1,21 @@
 import React, { useEffect } from 'react';
 import { useBooks } from '../contexts/BookContext';
 
-const FeynmanLectures = ({ onToggleNarration, isAudioPlaying }) => {
+const BriefHistoryOfTime = ({ onToggleNarration, isAudioPlaying }) => {
   const { setCurrentBookByPath } = useBooks();
 
   // Set current book when component mounts
   useEffect(() => {
-    setCurrentBookByPath('/');
+    setCurrentBookByPath('/brief-history-of-time');
   }, [setCurrentBookByPath]);
 
   return (
     <div className="book-page">
       <div className="book-container">
-        <h1 className='h1' style={{ textAlign: 'center' }}>The Feynman Lectures On Physics</h1>
+        <h1 className='h1' style={{ textAlign: 'center' }}>A Brief History of Time</h1>
         <div className="book-content narrow-text scrollable">
-          <div id="Ch1-S1-p1" className="para">
-            <p className="p">This two-year course in physics</p>
+          <div id="summary" className="para">
+            <p className="p">First published in 1988, this landmark book made complex concepts like the Big Bang, black holes.</p>
           </div>
         </div>
       </div>
@@ -23,4 +23,4 @@ const FeynmanLectures = ({ onToggleNarration, isAudioPlaying }) => {
   );
 };
 
-export default FeynmanLectures;
+export default BriefHistoryOfTime;

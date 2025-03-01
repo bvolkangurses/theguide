@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { FaBars, FaNotesMedical, FaComments } from 'react-icons/fa';
+import { FaBars, FaNotesMedical, FaComments, FaRegLightbulb } from 'react-icons/fa';
 import { useChat } from '../contexts/ChatContext';
+import { useBooks } from '../contexts/BookContext';
 import AudioPlayer from './AudioPlayer';
 import ChatPopup from './ChatPopup';
+import { getBookIdFromPath } from '../utils/bookIdMapper';
+import { saveAudioToCache } from '../utils/audioCache';
 
 const RightSidebar = ({ 
   isOpen, 
@@ -15,13 +18,21 @@ const RightSidebar = ({
   onChatUpdate
 }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
-  const { messages, addMessage } = useChat();
+  const { messages, addMessage, bookId: contextBookId } = useChat();
   const [inputValue, setInputValue] = useState('');
   const [audioUrl, setAudioUrl] = useState(null);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const audioRef = useRef(null);
   const [activeHighlight, setActiveHighlight] = useState(null);
   const [audioDuration, setAudioDuration] = useState(0);
+
+  // Get current book for publication year and API calls
+  const { currentBook } = useBooks();
+  
+  const publicationYear = currentBook?.publicationYear || new Date().getFullYear();
+  
+  // Use the consistent mapping function
+  const bookId = getBookIdFromPath(currentBook?.path);
 
   useEffect(() => {
     if (isMainAppPlaying && audioRef.current) {
@@ -44,26 +55,34 @@ const RightSidebar = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setInputValue(''); // clear immediately upon submit
+    setInputValue('');
     if (!inputValue.trim()) return;
 
-    const timestamp = new Date();
+    // Use current year for user messages
+    const currentDate = new Date();
+    
     addMessage({
       text: inputValue,
       type: 'user',
       timestamp: {
-        date: timestamp.toLocaleDateString(),
-        time: timestamp.toLocaleTimeString()
+        date: currentDate.toLocaleDateString(),
+        time: currentDate.toLocaleTimeString(),
+        year: currentDate.getFullYear(),
+        bookId: bookId // Add bookId
       }
     });
+    
     try {
+      const requestBody = { 
+        messages: [{ role: 'user', content: inputValue }],
+        bookId: bookId // This should now be consistent
+      };
+      
+      
       const response = await fetch('http://localhost:3000/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          messages: [{ role: 'user', content: inputValue }],
-          source: 'sidebar'
-        }),
+        body: JSON.stringify(requestBody),
       });
       if (!response.body) {
         console.error('ReadableStream not supported in this browser.');
@@ -89,6 +108,18 @@ const RightSidebar = ({
             try {
               const parsedData = JSON.parse(jsonStr);
               if (parsedData.audio) {
+                // Save audio with bookId for reuse
+                if (parsedData.audio.audioText) {
+                  saveAudioToCache(
+                    parsedData.audio.audioText, 
+                    { 
+                      audio: parsedData.audio.audioUrl,
+                      duration: parsedData.audio.duration || 0
+                    },
+                    bookId
+                  );
+                }
+                
                 setAudioUrl(parsedData.audio.audioUrl);
                 if (audioRef.current) audioRef.current.pause();
                 const audio = new Audio(parsedData.audio);
@@ -106,19 +137,30 @@ const RightSidebar = ({
         }
       }
       if (accumulatedResponse) {
-        const ts = new Date();
+        // Use publication year for assistant messages
+        const assistantDate = new Date();
+        assistantDate.setFullYear(publicationYear);
+        
         addMessage({
           text: accumulatedResponse.trim(),
           type: 'assistant',
           timestamp: {
-            date: ts.toLocaleDateString(),
-            time: ts.toLocaleTimeString()
+            date: assistantDate.toLocaleDateString(),
+            time: assistantDate.toLocaleTimeString(),
+            year: publicationYear,
+            bookId: bookId // Add bookId
           }
         });
       }
     } catch (error) {
       console.error('Error in chat submission:', error);
     }
+  };
+
+  // Format timestamp appropriately for each message type
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return '';
+    return `${timestamp.date} · ${timestamp.time}`;
   };
 
   return (
@@ -131,16 +173,25 @@ const RightSidebar = ({
         audioRef={audioRef}
         audioDuration={audioDuration}
       />
+      
       <div className="glow-stick-container">
         <div className={`glow-stick ${isAudioPlaying ? 'glowing' : ''}`} />
       </div>
+      
       {isOpen && (
-        <>
+        <div className="sidebar-content">
+          <h2>Notebook</h2>
           <div className="tabs">
-            <button className={`tab ${activeTab === 'notes' ? 'active' : ''}`} onClick={() => setActiveTab('notes')}>
-              <FaNotesMedical /> Notes
+            <button 
+              className={`tab ${activeTab === 'notes' ? 'active' : ''}`} 
+              onClick={() => setActiveTab('notes')}
+            >
+              <FaRegLightbulb /> Notes
             </button>
-            <button className={`tab ${activeTab === 'chat' ? 'active' : ''}`} onClick={() => setActiveTab('chat')}>
+            <button 
+              className={`tab ${activeTab === 'chat' ? 'active' : ''}`} 
+              onClick={() => setActiveTab('chat')}
+            >
               <FaComments /> Chat
             </button>
           </div>
@@ -149,12 +200,18 @@ const RightSidebar = ({
             {activeTab === 'notes' && (
               <div className="notes-content">
                 <div className="highlights-list">
-                  {highlightedNotes?.map(note => (
-                    <div key={note.id} className="highlight-note" onClick={() => setActiveHighlight(note)}>
-                      <div className="highlight-timestamp">{note.timestamp}</div>
-                      <div className="highlight-text">{note.text}</div>
+                  {highlightedNotes?.length > 0 ? (
+                    highlightedNotes.map(note => (
+                      <div key={note.id} className="highlight-note" onClick={() => setActiveHighlight(note)}>
+                        <div className="highlight-timestamp">{note.timestamp}</div>
+                        <div className="highlight-text">{note.text}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="empty-state">
+                      <p>No highlights yet. Select text in the book to highlight.</p>
                     </div>
-                  ))}
+                  )}
                 </div>
                 {activeHighlight && (
                   <ChatPopup
@@ -170,16 +227,22 @@ const RightSidebar = ({
             {activeTab === 'chat' && (
               <div className="chat-content">
                 <div className="chat-messages">
-                  {messages.map((msg, index) => (
-                    <div key={index} className={`chat-message-container ${msg.type}`}>
-                      {msg.timestamp && (
-                        <div className="chat-timestamp">
-                          {msg.timestamp.date} at {msg.timestamp.time}
-                        </div>
-                      )}
-                      <div className="chat-message">{msg.text}</div>
+                  {messages.length > 0 ? (
+                    messages.map((msg, index) => (
+                      <div key={index} className={`chat-message-container ${msg.type}`}>
+                        {msg.timestamp && (
+                          <div className="chat-timestamp">
+                            {formatTimestamp(msg.timestamp)}
+                          </div>
+                        )}
+                        <div className="chat-message">{msg.text}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="empty-state">
+                      <p>Start a conversation with the author.</p>
                     </div>
-                  ))}
+                  )}
                 </div>
                 <form onSubmit={handleSubmit} className="chat-input-form">
                   <input
@@ -188,12 +251,13 @@ const RightSidebar = ({
                     onChange={(e) => setInputValue(e.target.value)}
                     placeholder="Type your message..."
                     className="chat-input"
+                    autoComplete="off"
                   />
                 </form>
               </div>
             )}
           </div>
-        </>
+        </div>
       )}
     </div>
   );
