@@ -4,21 +4,6 @@
   text-align: left;  /* changed from center */
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
 body, html {
   overflow: hidden;
   cursor: default; /* Hide cursor outside the book container */
@@ -1064,48 +1049,65 @@ body.ripple-effect::after, html.ripple-effect::after {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 20px;
+  gap: 35px; /* Increased gap from 30px to 35px for better spacing */
+  z-index: 1002;
+  position: relative;
 }
 
 .audio-control-button {
-  position: relative;
-  z-index: 1002;
-  background-color: rgba(255, 255, 255, 0.75);
-  border: none;
-  border-radius: 4px;
-  padding: 8px 16px;
+  display: none;
+}
+
+.control-btn {
+  width: 52px; /* Increased from 44px to 52px */
+  height: 52px; /* Increased from 44px to 52px */
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease;
+  color: rgba(255, 255, 255, 1); /* Increased visibility from 0.7 to 0.8 */
+  position: relative;
+  transition: all 0.3s ease;
+  overflow: hidden;
+  outline: none; /* Remove default focus outline */
 }
 
-.audio-control-button.main-button {
-  padding: 10px 18px;
+.control-btn:focus {
+  /* Remove visible focus styles but maintain accessibility */
+  box-shadow: none;
 }
 
-.audio-control-button.skip-button {
-  padding: 10px 18px;
-  flex-direction: column;
+.control-btn svg {
+  z-index: 2;
+  font-size: 20px; /* Increased from 14px to 18px */
+  transition: transform 0.3s ease, color 0.3s ease;
 }
 
-.audio-control-button:hover {
-  background-color: white;
-  transform: scale(1.05);
+.control-btn .btn-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 1); /* Increased visibility from 0.7 to 0.8 */
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 1;
 }
 
-.audio-control-button svg {
-  width: 14px;
-  height: 14px;
-  color: #333;
+.control-btn:hover .btn-glow {
+  transform: translate(-50%, -50%) scale(1.5);
 }
 
-.audio-control-button.main-button svg {
-  width: 16px;
-  height: 16px;
+.control-btn:hover svg {
+  transform: scale(1.15);
+}
+
+.glow-stick.glowing {
+  color: rgba(255, 200, 50, 0.95); /* Increased brightness from 0.9 to 0.95 */
+}
+
+.glow-stick.glowing {
+  box-shadow: 0 0 15px rgba(255, 175, 2, 0.6); /* Increased from 0.5 to 0.6 */
 }
 
 /* Updated Tabs styling */
@@ -1345,7 +1347,7 @@ body.ripple-effect::after, html.ripple-effect::after {
 }
 
 .chat-messages::-webkit-scrollbar-thumb:hover,
-.highlights-list::-webkit-scrollbar-thumb:hover {
+highlights-list::-webkit-scrollbar-thumb:hover {
   background-color: rgba(0, 0, 0, 0.2);
 }
 
@@ -1371,4 +1373,466 @@ body.ripple-effect::after, html.ripple-effect::after {
 
 .highlight-btn:hover {
   color: #546e7a; /* Changed from #007bff */
+}
+
+/* Context Menu Styles */
+.context-menu {
+  position: fixed;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  z-index: 1010;
+  min-width: 180px;
+  animation: fadeIn 0.15s ease-out;
+  overflow: hidden;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  width: 100%;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: #333;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.context-menu-item:hover {
+  background-color: #f5f5f5;
+  color: #546e7a;
+}
+
+.context-menu-icon {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.context-menu-item:hover .context-menu-icon {
+  color: #546e7a;
+}
+
+/* Add Book Button in Sidebar */
+.sidebar-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: #333;
+  border: none;
+  padding: 10px;
+  width: 100%;
+  cursor: pointer;
+  font-size: 0.9rem;
+  text-align: left;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  margin: 10px 0;
+}
+
+.sidebar-button.add-book-button {
+  border: 1px dashed #ccc;
+  margin-top: 5px;
+  margin-bottom: 20px;
+}
+
+.sidebar-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.custom-book {
+  /* Style for custom books */
+  border-left: 3px solid #546e7a;
+}
+
+/* Modal Styling */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  backdrop-filter: blur(3px);
+}
+
+.modal-content {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: modalFadeIn 0.3s ease;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #333;
+}
+
+.close-modal-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.close-modal-btn:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: #333;
+}
+
+/* Form Styling */
+.add-book-form {
+  padding: 20px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.form-group input,
+.form-group textarea {
+  width: 95%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  border-color: #546e7a;
+  box-shadow: 0 0 0 2px rgba(84, 110, 122, 0.15);
+  outline: none;
+}
+
+.form-group input.error,
+.form-group textarea.error {
+  border-color: #dc3545;
+}
+
+.error-message {
+  color: #dc3545;
+  font-size: 0.85rem;
+  margin-top: 5px;
+}
+
+.form-group small {
+  display: block;
+  color: #666;
+  font-size: 0.8rem;
+  margin-top: 5px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.cancel-btn,
+.submit-btn {
+  padding: 10px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.cancel-btn {
+  background-color: transparent;
+  color: #666;
+  border: 1px solid #ddd;
+}
+
+.cancel-btn:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+  color: #333;
+}
+
+.submit-btn {
+  background-color: #546e7a;
+  color: white;
+  border: none;
+}
+
+.submit-btn:hover {
+  background-color: #455a64;
+}
+
+/* File Upload Styling */
+.file-upload-group {
+  margin-bottom: 20px;
+}
+
+.file-upload-container {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.file-input {
+  position: absolute;
+  width: 0.1px;
+  height: 0.1px;
+  opacity: 0;
+  overflow: hidden;
+  z-index: -1;
+}
+
+.file-upload-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 15px;
+  background-color: #f5f5f5;
+  color: #333;
+  border: 1px dashed #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-upload-label:hover {
+  background-color: #e9e9e9;
+  border-color: #546e7a;
+}
+
+.upload-status {
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  background-color: #f8f9fa;
+  color: #495057;
+}
+
+.upload-status.loading {
+  color: #0d6efd;
+}
+
+.custom-book-content {
+  padding: 20px;
+  margin: 0 auto;
+  max-width: 800px;
+}
+
+.custom-book-text {
+  white-space: pre-wrap;
+  line-height: 1.6;
+  margin-top: 20px;
+  font-size: 1rem;
+}
+
+.custom-book-placeholder {
+  background-color: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  margin-top: 20px;
+  text-align: center;
+  color: #6c757d;
+}
+
+/* Updated Glow Stick Styling for futuristic look */
+.glow-stick {
+  position: relative;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 40px;
+  background: gray;
+  backdrop-filter: blur(5px);
+  border-radius: 0;
+  transition: all 0.4s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.glow-stick::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  opacity: 0.8;
+}
+
+.glow-stick.glowing {
+  box-shadow: inset 0 0 20px 5px rgba(255, 175, 2, 0.5);
+  background: gray;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 35px;
+  z-index: 1002;
+  position: relative;
+}
+
+/* Simplified control buttons without glow effects */
+.control-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  display: flex;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: 0 !important;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-focus-ring-color: transparent;
+  -moz-outline-style: none;
+}
+
+.control-btn:focus {
+  outline: 0 !important;
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.control-btn:active {
+  outline: 0 !important;
+}
+
+.control-btn::-moz-focus-inner {
+  border: 0;
+}
+
+.control-btn:focus {
+  /* Remove visible focus styles but maintain accessibility */
+  box-shadow: none;
+}
+
+.control-btn svg {
+  z-index: 2;
+  font-size: 22px;
+  transition: transform 0.2s ease;
+}
+
+.control-btn:hover svg {
+  transform: scale(1.15);
+}
+
+.glow-stick.glowing .control-btn {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+/* Special styling for play/pause button - just slightly larger */
+.control-btn.play-pause svg {
+  font-size: 24px;
+}
+
+.glow-stick-container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 40px;
+  z-index: 1000;
+}
+
+/* Add these new styles for book actions */
+.book-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-decoration: none;
+  color: #333;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.book-actions {
+  display: flex;
+  gap: 5px;
+  opacity: 0.2;
+  transition: opacity 0.2s ease;
+}
+
+.book-link:hover .book-actions {
+  opacity: 1;
+}
+
+.book-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+  color: #555;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.book-action-btn:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: #333;
+}
+
+.book-action-btn.delete:hover {
+  color: #dc3545;
+}
+
+.custom-book {
+  border-left: 3px solid rgba(84, 110, 122, 0.5);
 }

@@ -12,9 +12,9 @@ const GlowStick = ({
       <div
         className={`glow-stick ${isAudioPlaying ? 'glowing' : ''}`}
       >
-        <div className="audio-controls-group">
+        <div className="controls">
           <button 
-            className="audio-control-button skip-button"
+            className="control-btn skip-backward"
             onClick={onSkipBackward}
             aria-label="Skip backward 10 seconds"
           >
@@ -22,7 +22,7 @@ const GlowStick = ({
           </button>
           
           <button 
-            className="audio-control-button main-button"
+            className="control-btn play-pause"
             onClick={onToggleAudio}
             aria-label={isAudioPlaying ? 'Pause' : 'Play'}
           >
@@ -30,7 +30,7 @@ const GlowStick = ({
           </button>
           
           <button 
-            className="audio-control-button skip-button"
+            className="control-btn skip-forward"
             onClick={onSkipForward}
             aria-label="Skip forward 10 seconds"
           >

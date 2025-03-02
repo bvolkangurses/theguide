@@ -31,6 +31,8 @@ import NineteenEightyFour from './pages/NineteenEightyFour';
 import MurderOrientExpress from './pages/MurderOrientExpress';
 import HarryPotter from './pages/HarryPotter';
 import BriefHistoryOfTime from './pages/BriefHistoryOfTime';
+import ContextMenu from './components/ContextMenu'; // Add this import
+import { findParagraphFromClickPosition } from './utils/textPositionUtils'; // Add this import
 
 function AppContent() {
   const { currentBook } = useBooks();
@@ -468,6 +470,11 @@ function AppContent() {
       setIsInputEditing(false); // Use renamed state
       setCurrentText('');
     }
+    
+    // Close context menu
+    if (!e.target.closest('.context-menu')) {
+      setContextMenuPosition(null);
+    }
   };
 
   const handleClear = () => {
@@ -495,6 +502,128 @@ function AppContent() {
     return () => clearTimeout(timer);
   }, [highlightedNotes, bookId, bookContainerRef]);
 
+  // Add new state for context menu
+  const [contextMenuPosition, setContextMenuPosition] = useState(null);
+  const [contextMenuParagraph, setContextMenuParagraph] = useState(null);
+
+  // Add right-click handler for context menu
+  const handleContextMenu = useCallback((e) => {
+    // Prevent default browser context menu
+    e.preventDefault();
+    
+    // Don't show context menu when audio is already playing
+    if (isAudioPlayingMain) {
+      return;
+    }
+    
+    // Find the paragraph at the click position
+    const paragraphInfo = findParagraphFromClickPosition(e, bookContainerRef);
+    
+    if (paragraphInfo) {
+      // Set context menu position
+      setContextMenuPosition({
+        x: e.clientX,
+        y: e.clientY
+      });
+      
+      // Save paragraph info for when user clicks "Start Reading"
+      setContextMenuParagraph(paragraphInfo);
+    }
+  }, [isAudioPlayingMain]);
+  
+  // Handle starting playback from clicked paragraph
+  const handleStartPlaybackFromPosition = useCallback(async () => {
+    if (!contextMenuParagraph) return;
+    
+    // Close the context menu
+    setContextMenuPosition(null);
+    
+    // Set the paragraphs array and current index
+    const allParagraphs = contextMenuParagraph.allParagraphs;
+    const startIndex = contextMenuParagraph.index;
+    
+    if (allParagraphs.length > 0) {
+      // Update paragraphs array and current index
+      setParagraphsMain(allParagraphs);
+      setCurrentParagraphIndexMain(startIndex);
+      
+      // Show progress bar
+      setShowProgressBarMain(true);
+      
+      // Start audio playback
+      setIsAudioPlayingMain(true);
+      const paragraphText = allParagraphs[startIndex];
+      
+      try {
+        // Check cache first
+        const cachedAudio = getAudioFromCache(paragraphText, bookId);
+        
+        if (cachedAudio) {
+          // Use cached audio
+          setAudioUrlMain(cachedAudio.audio);
+          setAudioDurationMain(cachedAudio.duration);
+        } else {
+          // Fetch from API
+          const response = await fetch('http://localhost:3000/synthesize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              text: paragraphText,
+              bookId: bookId
+            }),
+          });
+          
+          if (!response.ok) {
+            return;
+          }
+          
+          const data = await response.json();
+          if (data.audio && data.duration) {
+            // Save to cache
+            saveAudioToCache(paragraphText, data, bookId);
+            
+            setAudioUrlMain(data.audio);
+            setAudioDurationMain(data.duration);
+          }
+        }
+      } catch (error) {
+        console.error("Error starting playback from position:", error);
+        setIsAudioPlayingMain(false);
+      }
+    }
+  }, [contextMenuParagraph, bookId]);
+  
+  // Handle closing the context menu
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenuPosition(null);
+    setContextMenuParagraph(null);
+  }, []);
+  
+  // Add click handler for outside clicks to close context menu
+  useEffect(() => {
+    const handleDocumentClick = (e) => {
+      if (contextMenuPosition && !e.target.closest('.context-menu')) {
+        setContextMenuPosition(null);
+      }
+    };
+    
+    document.addEventListener('click', handleDocumentClick);
+    return () => document.removeEventListener('click', handleDocumentClick);
+  }, [contextMenuPosition]);
+  
+  // Add context menu event listener to book container
+  useEffect(() => {
+    const bookContainer = bookContainerRef.current;
+    
+    if (bookContainer) {
+      bookContainer.addEventListener('contextmenu', handleContextMenu);
+      
+      return () => {
+        bookContainer.removeEventListener('contextmenu', handleContextMenu);
+      };
+    }
+  }, [handleContextMenu, bookContainerRef]);
+  
   return (
     <div className="app-container" onClick={handleOutsideClick}>
       <Sidebar 
@@ -575,6 +704,13 @@ function AppContent() {
                 isEditing={isHighlightEditing} // Use renamed prop
               />
             )}
+            {contextMenuPosition && (
+              <ContextMenu
+                position={contextMenuPosition}
+                onStartPlayback={handleStartPlaybackFromPosition}
+                onClose={handleCloseContextMenu}
+              />
+            )}
           </>
         } />
         <Route path="/origin-of-species" element={
@@ -644,6 +780,13 @@ function AppContent() {
                 isEditing={isHighlightEditing}
               />
             )}
+            {contextMenuPosition && (
+              <ContextMenu
+                position={contextMenuPosition}
+                onStartPlayback={handleStartPlaybackFromPosition}
+                onClose={handleCloseContextMenu}
+              />
+            )}
           </>
         } />
         <Route path="/murder-on-the-orient-express" element={
@@ -711,6 +854,13 @@ function AppContent() {
                 onRemove={handleRemoveHighlight}
                 onEdit={handleEditHighlight}
                 isEditing={isHighlightEditing}
+              />
+            )}
+            {contextMenuPosition && (
+              <ContextMenu
+                position={contextMenuPosition}
+                onStartPlayback={handleStartPlaybackFromPosition}
+                onClose={handleCloseContextMenu}
               />
             )}
           </>
@@ -783,6 +933,13 @@ function AppContent() {
                 isEditing={isHighlightEditing}
               />
             )}
+            {contextMenuPosition && (
+              <ContextMenu
+                position={contextMenuPosition}
+                onStartPlayback={handleStartPlaybackFromPosition}
+                onClose={handleCloseContextMenu}
+              />
+            )}
           </>
         } />
         <Route path="/harry-potter" element={
@@ -852,6 +1009,13 @@ function AppContent() {
                 isEditing={isHighlightEditing}
               />
             )}
+            {contextMenuPosition && (
+              <ContextMenu
+                position={contextMenuPosition}
+                onStartPlayback={handleStartPlaybackFromPosition}
+                onClose={handleCloseContextMenu}
+              />
+            )}
           </>
         } />
         <Route path="/brief-history-of-time" element={
@@ -919,6 +1083,105 @@ function AppContent() {
                 onRemove={handleRemoveHighlight}
                 onEdit={handleEditHighlight}
                 isEditing={isHighlightEditing}
+              />
+            )}
+            {contextMenuPosition && (
+              <ContextMenu
+                position={contextMenuPosition}
+                onStartPlayback={handleStartPlaybackFromPosition}
+                onClose={handleCloseContextMenu}
+              />
+            )}
+          </>
+        } />
+        {/* Add a catch-all route for custom books */}
+        <Route path="*" element={
+          <>
+            <div ref={bookContainerRef} className="custom-book-content scrollable">
+              <div className="book-container">
+                {currentBook && (
+                  <div>
+                    <h1>{currentBook.title}</h1>
+                    <h3>by {currentBook.author} ({currentBook.publicationYear})</h3>
+                    
+                    {currentBook.content ? (
+                      <div className="custom-book-text">
+                        {currentBook.content}
+                      </div>
+                    ) : (
+                      <div className="custom-book-placeholder">
+                        <p>This is a custom book. You can add content by uploading a text file when creating or editing the book.</p>
+                        <p>You can ask questions about this book and the AI will use the system prompt you provided.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* Rest of the components remain the same */}
+            <RightSidebar 
+              isOpen={isRightSidebarOpen}
+              onClose={() => setIsRightSidebarOpen(false)}
+              onOpen={() => setIsRightSidebarOpen(true)}
+              isMainAppPlaying={isMainAppPlaying}
+              highlightedNotes={highlightedNotes}
+              defaultTab="notes"
+              highlightChats={highlightChats}
+              onChatUpdate={handleChatUpdate}
+            />
+            <TextDisplay texts={texts} />
+            {isInputEditing && (
+              <TextInput
+                textPosition={textPosition}
+                currentText={currentText}
+                setCurrentText={setCurrentText}
+                handleTextChange={handleTextChange}
+                handleKeyPress={handleKeyPress}
+                inputRef={inputRef}
+              />
+            )}
+            <AudioProgressBar 
+              isAudioPlaying={isAudioPlayingMain}
+              audioDuration={audioDurationMain}
+              audioProgress={audioProgressMain}
+              audioRef={audioRefMain}
+            />
+            <GlowStick 
+              isAudioPlaying={isAudioPlayingMain || isAudioPlaying} 
+              onToggleAudio={handleToggleNarrationMain}
+              onSkipForward={handleSkipForward}
+              onSkipBackward={handleSkipBackward}
+            />
+            <AudioPlayerMain
+              audioUrl={audioUrlMain}
+              setIsAudioPlaying={setIsAudioPlayingMain}
+              audioRef={audioRefMain}
+              setMainAppPlaying={setIsMainAppPlaying}
+              audioDuration={audioDurationMain}
+              onProgress={setAudioProgressMain}
+              onAudioEnded={handleAudioEndedMain}
+              isWaitingForNextParagraph={isWaitingForNextParagraphMain}
+              enableProgressTracking={showProgressBarMain}
+            />
+            <AudioPlayer
+              audioUrl={audioUrl}
+              setIsAudioPlaying={setIsAudioPlaying}
+              audioRef={audioRef}
+            />
+            {popupPosition && (
+              <HighlightPopup
+                position={popupPosition}
+                onHighlight={handleHighlight}
+                onRemove={handleRemoveHighlight}
+                onEdit={handleEditHighlight}
+                isEditing={isHighlightEditing}
+              />
+            )}
+            {contextMenuPosition && (
+              <ContextMenu
+                position={contextMenuPosition}
+                onStartPlayback={handleStartPlaybackFromPosition}
+                onClose={handleCloseContextMenu}
               />
             )}
           </>

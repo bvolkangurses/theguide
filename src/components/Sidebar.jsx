@@ -1,16 +1,19 @@
-import React, { useEffect } from 'react';
-import { FaBook, FaTrash, FaEraser, FaBars, FaBroom } from 'react-icons/fa';
+import React, { useEffect, useState } from 'react';
+import { FaBook, FaTrash, FaEraser, FaBars, FaBroom, FaPlus, FaEdit, FaTimes } from 'react-icons/fa';
 import { Link, useLocation } from "react-router-dom";
 import { useChat } from '../contexts/ChatContext';
 import { useBooks } from '../contexts/BookContext';
 import { clearAudioCache, clearBookAudioCache } from '../utils/audioCache';
 import { clearNarrationPosition, clearBookNarrationPosition } from '../utils/narrationPositionManager';
 import { getBookSpecificKey } from '../utils/storageKeyManager';
+import AddBookModal from './AddBookModal';
 
 const Sidebar = ({ isOpen, onClose, onOpen, onClearTexts }) => {
   const { clearMessages } = useChat();
   const location = useLocation();
-  const { books, loading, currentBook } = useBooks();
+  const { books, loading, currentBook, addCustomBook, removeCustomBook, customBooks, setCurrentBookByPath } = useBooks();
+  const [isAddBookModalOpen, setIsAddBookModalOpen] = useState(false);
+  const [bookToEdit, setBookToEdit] = useState(null);
   
   // Helper function to determine if a title is short
   const isShortTitle = (title) => {
@@ -63,60 +66,140 @@ const Sidebar = ({ isOpen, onClose, onOpen, onClearTexts }) => {
       // Refresh the page to reset all components
       window.location.reload();
   };
+  
+  const handleOpenAddBookModal = (e) => {
+    e.stopPropagation();
+    setBookToEdit(null);
+    setIsAddBookModalOpen(true);
+  };
+  
+  const handleEditBook = (e, book) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setBookToEdit(book);
+    setIsAddBookModalOpen(true);
+  };
+  
+  const handleRemoveBook = (e, bookId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (window.confirm("Are you sure you want to remove this book?")) {
+      removeCustomBook(bookId);
+    }
+  };
+
+  const openAddBookModal = () => {
+    setIsAddBookModalOpen(true);
+  };
+
+  const closeAddBookModal = () => {
+    setIsAddBookModalOpen(false);
+  };
 
   return (
-    <div className={`sidebar-left ${isOpen ? 'open' : ''}`} onClick={(e) => {
-      e.stopPropagation();
-      if (!isOpen) onOpen();
-    }}>
-      {!isOpen && <FaBars className="open-icon" />}
-      {isOpen && (
-        <div className="sidebar-content">
-          <h2>Library</h2>
-          {loading ? (
-            <div>Loading books...</div>
-          ) : (
-            <ul className="book-list">
-              {books && books.length > 0 ? books.map(book => (
-                <li key={book.id || Math.random()}>
-                  <Link 
-                    to={book.path} 
-                    className={`book-link ${location.pathname === book.path ? 'active' : ''}`}
-                  >
-                    <div className="book-link-content">
-                      <div className={`book-title ${isShortTitle(book.title) ? 'short-title' : ''}`}>
-                        {book.title}
-                      </div>
-                      {book.author && (
-                        <div className="book-author">by {book.author} ({book.publicationYear})</div>
+    <>
+      <div className={`sidebar-left ${isOpen ? 'open' : ''}`} onClick={(e) => {
+        e.stopPropagation();
+        if (!isOpen) onOpen();
+      }}>
+        {!isOpen && <FaBars className="open-icon" />}
+        {isOpen && (
+          <div className="sidebar-content">
+            <h2>
+              Library
+              <button 
+                className="close-btn" 
+                onClick={onClose}
+                style={{ position: 'absolute', right: '15px', top: '15px' }}
+              >
+                <FaTimes />
+              </button>
+            </h2>
+            {loading ? (
+              <div>Loading books...</div>
+            ) : (
+              <ul className="book-list">
+                {books && books.length > 0 ? books.map(book => (
+                  <li key={book.id || Math.random()}>
+                    <div className="book-item">
+                      <Link 
+                        to={book.path} 
+                        className={`book-link ${location.pathname === book.path ? 'active' : ''} ${book.isCustom ? 'custom-book' : ''}`}
+                      >
+                        <div className="book-link-content" onClick={() => {
+                          setCurrentBookByPath(book.path);
+                          onClose();
+                        }}>
+                          <div className={`book-title ${isShortTitle(book.title) ? 'short-title' : ''}`}>
+                            {book.title}
+                          </div>
+                          {book.author && (
+                            <div className="book-author">by {book.author} ({book.publicationYear})</div>
+                          )}
+                        </div>
+                      </Link>
+                      
+                      {/* Add edit/delete buttons for custom books */}
+                      {book.isCustom && (
+                        <div className="book-actions">
+                          <button 
+                            className="book-action-btn edit-btn"
+                            onClick={(e) => handleEditBook(e, book)}
+                            title="Edit book"
+                          >
+                            <FaEdit />
+                          </button>
+                          <button 
+                            className="book-action-btn delete-btn"
+                            onClick={(e) => handleRemoveBook(e, book.id)}
+                            title="Delete book"
+                          >
+                            <FaTrash />
+                          </button>
+                        </div>
                       )}
                     </div>
-                  </Link>
-                </li>
-              )) : <div>No books available</div>}
-            </ul>
-          )}
-          <button
-            className="clear-button clear-texts"
-            onClick={onClearTexts}
-          >
-            <FaEraser /> Clear Whiteboard
-          </button>
-          <button
-            className="clear-button clear-current-book"
-            onClick={handleClearBookData}
-          >
-            <FaBroom /> Clear Book Data
-          </button>
-          <button
-            className="clear-button"
-            onClick={() => { handleClear(); handleClearAudioCache(); }}
-          >
-            <FaTrash /> Clear All Data
-          </button>
-        </div>
-      )}
-    </div>
+                  </li>
+                )) : <div>No books available</div>}
+              </ul>
+            )}
+            
+            <button 
+              className="sidebar-button add-book-button"
+              onClick={openAddBookModal}
+            >
+              <FaPlus /> Add Book
+            </button>
+            
+            <button
+              className="clear-button clear-texts"
+              onClick={onClearTexts}
+            >
+              <FaEraser /> Clear Whiteboard
+            </button>
+            <button
+              className="clear-button clear-current-book"
+              onClick={handleClearBookData}
+            >
+              <FaBroom /> Clear Book Data
+            </button>
+            <button
+              className="clear-button"
+              onClick={() => { handleClear(); handleClearAudioCache(); }}
+            >
+              <FaTrash /> Clear All Data
+            </button>
+          </div>
+        )}
+      </div>
+      
+      <AddBookModal 
+        isOpen={isAddBookModalOpen}
+        onClose={closeAddBookModal}
+        onAddBook={addCustomBook}
+        bookToEdit={bookToEdit}
+      />
+    </>
   );
 };
 

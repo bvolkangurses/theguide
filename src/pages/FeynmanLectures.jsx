@@ -2,12 +2,14 @@ import React, { useEffect } from 'react';
 import { useBooks } from '../contexts/BookContext';
 
 const FeynmanLectures = ({ onToggleNarration, isAudioPlaying }) => {
-  const { setCurrentBookByPath } = useBooks();
+  const { books, setCurrentBookByPath } = useBooks();
 
-  // Set current book when component mounts
+  // Set current book when component mounts and books are loaded
   useEffect(() => {
-    setCurrentBookByPath('/');
-  }, [setCurrentBookByPath]);
+    if (books && books.length > 0) {
+      setCurrentBookByPath('/');
+    }
+  }, [books, setCurrentBookByPath]);
 
   return (
     <div className="book-page">
