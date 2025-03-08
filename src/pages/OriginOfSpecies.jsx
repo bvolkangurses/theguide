@@ -13,12 +13,12 @@ const OriginOfSpecies = ({ onToggleNarration, isAudioPlaying }) => {
 
   return (
     <div className="book-page">
-      <div className="book-container scrollable">
-      <h1 className='h1' style={{ textAlign: 'center' }}>On the Origin of Species</h1>
-        <div className="book-content">
-          {/* Book content here */}
-          <p>WHEN we look to the individuals of the same variety </p>
-            {/* More paragraphs... */}
+      <div className="book-container">
+        <h1 className='h1' style={{ textAlign: 'center' }}>On the Origin of Species</h1>
+        <div className="book-content narrow-text scrollable">
+          <div id="Ch1-S1-p1" className="para">
+            <p className="p">When we look to the individuals of the same variety</p>
+          </div>
         </div>
       </div>
     </div>

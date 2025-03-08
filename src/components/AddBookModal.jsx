@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FaBook, FaTimes, FaUpload } from 'react-icons/fa';
 import { useBooks } from '../contexts/BookContext';
 
-const AddBookModal = ({ isOpen, onClose }) => {
-  const { addCustomBook } = useBooks();
-  
+const AddBookModal = ({ isOpen, onClose, onAddBook, bookToEdit }) => {
   const [bookData, setBookData] = useState({
     title: '',
     author: '',
@@ -18,9 +16,40 @@ const AddBookModal = ({ isOpen, onClose }) => {
   const [fileContent, setFileContent] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   
-  // Generate system prompt whenever author or title changes
+  // Reset or populate form when modal opens/closes or bookToEdit changes
   useEffect(() => {
-    if (bookData.author && bookData.title) {
+    if (isOpen) {
+      if (bookToEdit) {
+        // Populate form with existing book data for editing
+        setBookData({
+          title: bookToEdit.title || '',
+          author: bookToEdit.author || '',
+          publicationYear: bookToEdit.publicationYear || new Date().getFullYear(),
+          path: bookToEdit.path || '',
+          content: bookToEdit.content || '',
+          systemPrompt: bookToEdit.systemPrompt || ''
+        });
+        setFileContent(null); // Reset file content when editing
+      } else {
+        // Reset form for new book
+        setBookData({
+          title: '',
+          author: '',
+          publicationYear: new Date().getFullYear(),
+          path: '',
+          content: '',
+          systemPrompt: ''
+        });
+        setFileContent(null);
+      }
+      setErrors({});
+    }
+  }, [isOpen, bookToEdit]);
+  
+  // Generate system prompt whenever author or title changes
+  // Only auto-generate if it hasn't been manually edited or it's a new book
+  useEffect(() => {
+    if (bookData.author && bookData.title && (!bookToEdit || !bookToEdit.systemPrompt)) {
       const generatedPrompt = 
         `You are ${bookData.author}. You are speaking to someone reading ${bookData.title}. When responding keep ${bookData.author}'s personality in mind. Keep your responses under 100 words.`;
       
@@ -29,11 +58,11 @@ const AddBookModal = ({ isOpen, onClose }) => {
         systemPrompt: generatedPrompt
       }));
     }
-  }, [bookData.author, bookData.title]);
+  }, [bookData.author, bookData.title, bookToEdit]);
   
-  // Path generator based on title
+  // Path generator based on title (only for new books)
   useEffect(() => {
-    if (bookData.title) {
+    if (bookData.title && !bookToEdit) {
       const generatedPath = `/${bookData.title
         .toLowerCase()
         .replace(/[^\w\s]/g, '')
@@ -44,7 +73,7 @@ const AddBookModal = ({ isOpen, onClose }) => {
         path: generatedPath
       }));
     }
-  }, [bookData.title]);
+  }, [bookData.title, bookToEdit]);
   
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -118,16 +147,24 @@ const AddBookModal = ({ isOpen, onClose }) => {
       return;
     }
     
-    // Create custom book ID
-    const customId = `custom-${Date.now()}`;
+    if (bookToEdit) {
+      // Update existing book
+      const updatedBook = {
+        ...bookToEdit,
+        ...bookData
+      };
+      onAddBook(updatedBook);
+    } else {
+      // Create new book with custom ID
+      const newBook = {
+        ...bookData,
+        id: `custom-${Date.now()}`,
+        authorVoiceID: 'default',
+        isCustom: true // Ensure the book is marked as custom
+      };
+      onAddBook(newBook);
+    }
     
-    const newBook = {
-      ...bookData,
-      id: customId,
-      authorVoiceID: 'default' // Use default voice ID
-    };
-    
-    addCustomBook(newBook);
     onClose();
   };
   
@@ -137,7 +174,7 @@ const AddBookModal = ({ isOpen, onClose }) => {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h2><FaBook /> Add New Book</h2>
+          <h2><FaBook /> {bookToEdit ? 'Edit Book' : 'Add New Book'}</h2>
           <button className="close-modal-btn" onClick={onClose}>
             <FaTimes />
           </button>
@@ -191,19 +228,20 @@ const AddBookModal = ({ isOpen, onClose }) => {
                 value={bookData.path}
                 onChange={handleInputChange}
                 className={errors.path ? 'error' : ''}
+                disabled={bookToEdit} // Path should not be editable for existing books
               />
               {errors.path && <div className="error-message">{errors.path}</div>}
-              <small>Path must start with / (e.g., /my-book)</small>
+              <small>Path must start with / (e.g., /my-book){bookToEdit ? ' - Cannot be changed for existing books' : ''}</small>
             </div>
             
             <div className="file-upload-group">
-              <label>Book Content (Optional)</label>
+              <label>Book Content {bookToEdit ? '(Upload to replace existing content)' : '(Optional)'}</label>
               <div className="file-upload-container">
                 <input
                   type="file"
                   id="book-content-file"
                   className="file-input"
-                  accept=".txt"
+                  accept=".txt,.md,.text"
                   onChange={handleFileUpload}
                 />
                 <label htmlFor="book-content-file" className="file-upload-label">
@@ -212,6 +250,7 @@ const AddBookModal = ({ isOpen, onClose }) => {
               </div>
               {isUploading && <div className="upload-status loading">Uploading...</div>}
               {fileContent && <div className="upload-status">File uploaded successfully!</div>}
+              {bookToEdit && bookToEdit.content && !fileContent && <div className="upload-status">Current content will be preserved unless you upload a new file</div>}
               {errors.file && <div className="error-message">{errors.file}</div>}
             </div>
             
@@ -224,7 +263,7 @@ const AddBookModal = ({ isOpen, onClose }) => {
                 onChange={handleInputChange}
                 rows={4}
               />
-              <small>This prompt is auto-generated but can be edited if needed</small>
+              <small>This prompt guides how the AI responds when discussing this book</small>
             </div>
             
             <div className="form-actions">
@@ -232,7 +271,7 @@ const AddBookModal = ({ isOpen, onClose }) => {
                 Cancel
               </button>
               <button type="submit" className="submit-btn">
-                Add Book
+                {bookToEdit ? 'Update Book' : 'Add Book'}
               </button>
             </div>
           </form>

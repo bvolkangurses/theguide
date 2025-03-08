@@ -33,13 +33,6 @@ const Sidebar = ({ isOpen, onClose, onOpen, onClearTexts }) => {
     // Clear localStorage
     window.localStorage.clear();
     
-    // Re-add any keys that start with __persistent to preserve them
-    Object.keys(items).forEach(key => {
-      if (key.startsWith('__persistent')) {
-        localStorage.setItem(key, items[key]);
-      }
-    });
-    
     clearMessages();
     window.location.reload();
   };

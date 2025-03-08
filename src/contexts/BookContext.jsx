@@ -52,62 +52,56 @@ export const BookProvider = ({ children }) => {
     }
   }, [location, books]);
   
-  // Function to add a new custom book
+  // Function to add a new custom book or update an existing one
   const addCustomBook = (bookData) => {
-    // Ensure the book has a system prompt
-    if (!bookData.systemPrompt && bookData.author && bookData.title) {
-      bookData.systemPrompt = `You are ${bookData.author}. You are speaking to someone reading ${bookData.title}. When responding keep ${bookData.author}'s personality in mind. Keep your responses under 100 words.`;
+    // Check if this is an update or new book
+    const isUpdate = bookData.id && customBooks.some(book => book.id === bookData.id);
+    
+    if (isUpdate) {
+      // Update existing book
+      const updatedBooks = customBooks.map(book => 
+        book.id === bookData.id ? { ...bookData, isCustom: true } : book
+      );
+      setCustomBooks(updatedBooks);
+      
+      // Save to localStorage
+      try {
+        localStorage.setItem('__persistent_custom_books', JSON.stringify(updatedBooks));
+      } catch (error) {
+        console.error('Error saving updated custom books:', error);
+      }
+    } else {
+      // Ensure the book has a system prompt
+      if (!bookData.systemPrompt && bookData.author && bookData.title) {
+        bookData.systemPrompt = `You are ${bookData.author}. You are speaking to someone reading ${bookData.title}. When responding keep ${bookData.author}'s personality in mind. Keep your responses under 100 words.`;
+      }
+      
+      // Add a new book
+      const newBook = {
+        ...bookData,
+        id: bookData.id || `custom-${Date.now()}`,
+        isCustom: true
+      };
+      
+      const newBooks = [...customBooks, newBook];
+      setCustomBooks(newBooks);
+      
+      // Save to localStorage
+      try {
+        localStorage.setItem('__persistent_custom_books', JSON.stringify(newBooks));
+      } catch (error) {
+        console.error('Error saving custom books:', error);
+      }
     }
     
-    const newBooks = [...customBooks, bookData];
-    setCustomBooks(newBooks);
-    
-    // Save to localStorage
-    try {
-      localStorage.setItem('__persistent_custom_books', JSON.stringify(newBooks));
-    } catch (error) {
-      console.error('Error saving custom books:', error);
-    }
-    
-    // Navigate to the new book's path
+    // Navigate to the book's path if provided
     if (bookData.path) {
       navigate(bookData.path);
     }
   };
   
-  // New function to update an existing custom book
-  const updateCustomBook = (updatedBook) => {
-    if (!updatedBook.id.startsWith('custom-')) {
-      console.warn("Can only update custom books");
-      return;
-    }
-    
-    const updatedBooks = customBooks.map(book => 
-      book.id === updatedBook.id ? updatedBook : book
-    );
-    
-    setCustomBooks(updatedBooks);
-    
-    // Save to localStorage
-    try {
-      localStorage.setItem('__persistent_custom_books', JSON.stringify(updatedBooks));
-    } catch (error) {
-      console.error('Error saving updated custom books:', error);
-    }
-    
-    // Navigate to the book's path
-    if (updatedBook.path) {
-      navigate(updatedBook.path);
-    }
-  };
-  
   // Function to remove a custom book
   const removeCustomBook = (bookId) => {
-    if (!bookId.startsWith('custom-')) {
-      console.warn("Can only remove custom books");
-      return;
-    }
-    
     const updatedBooks = customBooks.filter(book => book.id !== bookId);
     setCustomBooks(updatedBooks);
     
@@ -116,6 +110,14 @@ export const BookProvider = ({ children }) => {
       localStorage.setItem('__persistent_custom_books', JSON.stringify(updatedBooks));
     } catch (error) {
       console.error('Error saving custom books after removal:', error);
+    }
+    
+    // If the current book is being removed, navigate to the first available book
+    if (currentBook && currentBook.id === bookId) {
+      const firstBook = books.find(book => book.id !== bookId);
+      if (firstBook) {
+        navigate(firstBook.path);
+      }
     }
   };
   
@@ -152,7 +154,6 @@ export const BookProvider = ({ children }) => {
         currentBook,
         loading,
         addCustomBook,
-        updateCustomBook,
         removeCustomBook,
         customBooks,
         setCurrentBookByPath
