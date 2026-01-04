@@ -23,7 +23,6 @@ import useLocalStorage, { useBookStorage } from './hooks/useLocalStorage'; // Fi
 import AudioProgressBar from './components/AudioProgressBar';
 import { saveAudioToCache, getAudioFromCache, cleanupAudioCache, clearBookAudioCache } from './utils/audioCache';
 import { saveNarrationPosition, loadNarrationPosition, clearNarrationPosition } from './utils/narrationPositionManager';
-import { getBookIdFromPath } from './utils/bookIdMapper';
 import { getBookSpecificKey } from './utils/storageKeyManager';
 import { restoreHighlights } from './utils/highlightUtils';
 import TextAudioSynthesis from './services/TextAudioSynthesis';
@@ -36,7 +35,7 @@ import { findParagraphFromClickPosition } from './utils/textPositionUtils'; // A
 
 function AppContent() {
   const { currentBook } = useBooks();
-  const bookId = getBookIdFromPath(currentBook?.path);
+  const bookId = currentBook?.id;
   
   // Use book-specific storage with our new hook
   const [texts, setTexts] = useBookStorage('texts', bookId, []);
@@ -624,6 +623,80 @@ function AppContent() {
     }
   }, [handleContextMenu, bookContainerRef]);
   
+  // Add state for last read paragraph
+  const [lastReadParagraphIndex, setLastReadParagraphIndex] = useState(null);
+
+  // Update last read paragraph when current paragraph changes
+  useEffect(() => {
+    if (currentParagraphIndexMain !== null) {
+      setLastReadParagraphIndex(currentParagraphIndexMain);
+    }
+  }, [currentParagraphIndexMain]);
+
+  // Function to render the appropriate book component based on currentBook
+  const renderBookContent = () => {
+    if (!currentBook) {
+      return null;
+    }
+
+    const bookProps = {
+      onToggleNarration: handleToggleNarrationMain,
+      isAudioPlaying: isAudioPlayingMain,
+      currentParagraphIndex: currentParagraphIndexMain,
+      paragraphs: paragraphsMain,
+      lastReadParagraphIndex: lastReadParagraphIndex
+    };
+
+    // Map book IDs to their components - using numeric IDs from DEFAULT_BOOKS_METADATA
+    const bookComponents = {
+      '1': <FeynmanLectures {...bookProps} />,
+      '2': <OriginOfSpecies {...bookProps} />,
+      '3': <MurderOrientExpress {...bookProps} />,
+      '4': <NineteenEightyFour {...bookProps} />
+    };
+
+    // If it's a custom book, render the custom book content
+    if (currentBook.isCustom) {
+      return (
+        <div className="custom-book-content scrollable">
+          <div className="book-container">
+            <div>
+              <h1>{currentBook.title}</h1>
+              <h3>by {currentBook.author} ({currentBook.publicationYear})</h3>
+              
+              {currentBook.content ? (
+                <div className="custom-book-text">
+                  {currentBook.content.split(/\n\s*\n/).map((paragraph, index) => (
+                    <p 
+                      key={index}
+                      className={
+                        index === currentParagraphIndexMain 
+                          ? 'current-paragraph' 
+                          : index === lastReadParagraphIndex && !isAudioPlayingMain
+                            ? 'last-read-paragraph'
+                            : ''
+                      }
+                    >
+                      {paragraph}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <div className="custom-book-placeholder">
+                  <p>This is a custom book. You can add content by uploading a text file when creating or editing the book.</p>
+                  <p>You can ask questions about this book and the AI will use the system prompt you provided.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Return the appropriate book component or null if not found
+    return bookComponents[currentBook.id] || null;
+  };
+
   return (
     <div className="app-container" onClick={handleOutsideClick}>
       <Sidebar 
@@ -633,492 +706,10 @@ function AppContent() {
         onClearTexts={handleClearTextsOnly} 
       />
 
-      <Routes>
-        <Route path="/" element={
-          <>
-            {/* Add ref to FeynmanLectures */}
-            <div ref={bookContainerRef}>
-              <FeynmanLectures 
-                onToggleNarration={handleToggleNarrationMain}
-                isAudioPlaying={isAudioPlayingMain}
-              />
-            </div>
-            <RightSidebar 
-              isOpen={isRightSidebarOpen}
-              onClose={() => setIsRightSidebarOpen(false)}
-              onOpen={() => setIsRightSidebarOpen(true)}
-              isMainAppPlaying={isMainAppPlaying}
-              highlightedNotes={highlightedNotes}
-              defaultTab="notes"
-              highlightChats={highlightChats}
-              onChatUpdate={handleChatUpdate}
-            />
-            <TextDisplay texts={texts} />
-            {isInputEditing && ( // Use renamed state
-              <TextInput
-                textPosition={textPosition}
-                currentText={currentText}
-                setCurrentText={setCurrentText}
-                handleTextChange={handleTextChange}
-                handleKeyPress={handleKeyPress}
-                inputRef={inputRef}
-              />
-            )}
-            {/* Conditionally render AudioProgressBar based on flag */}
-            
-              <AudioProgressBar 
-                isAudioPlaying={isAudioPlayingMain}
-                audioDuration={audioDurationMain}
-                audioProgress={audioProgressMain}
-                audioRef={audioRefMain}
-              />
-            
-            <GlowStick 
-              isAudioPlaying={isAudioPlayingMain || isAudioPlaying} 
-              onToggleAudio={handleToggleNarrationMain}
-              onSkipForward={handleSkipForward}
-              onSkipBackward={handleSkipBackward}
-            />
-            <AudioPlayerMain
-              audioUrl={audioUrlMain}
-              setIsAudioPlaying={setIsAudioPlayingMain}
-              audioRef={audioRefMain}
-              setMainAppPlaying={setIsMainAppPlaying} // Add this prop
-              audioDuration={audioDurationMain}
-              onProgress={setAudioProgressMain}
-              onAudioEnded={handleAudioEndedMain} // Pass the handler as a prop
-              isWaitingForNextParagraph={isWaitingForNextParagraphMain}
-              enableProgressTracking={showProgressBarMain} // Pass the flag to AudioPlayer
-            />
-            <AudioPlayer
-              audioUrl={audioUrl}
-              setIsAudioPlaying={setIsAudioPlaying}
-              audioRef={audioRef}
-            />
-            {popupPosition && (
-              <HighlightPopup
-                position={popupPosition}
-                onHighlight={handleHighlight}
-                onRemove={handleRemoveHighlight}
-                onEdit={handleEditHighlight}
-                isEditing={isHighlightEditing} // Use renamed prop
-              />
-            )}
-            {contextMenuPosition && (
-              <ContextMenu
-                position={contextMenuPosition}
-                onStartPlayback={handleStartPlaybackFromPosition}
-                onClose={handleCloseContextMenu}
-              />
-            )}
-          </>
-        } />
-        <Route path="/origin-of-species" element={
-          <>
-            <div ref={bookContainerRef}>
-              <OriginOfSpecies 
-                onToggleNarration={handleToggleNarrationMain}
-                isAudioPlaying={isAudioPlayingMain}
-              />
-            </div>
-            <RightSidebar 
-              isOpen={isRightSidebarOpen}
-              onClose={() => setIsRightSidebarOpen(false)}
-              onOpen={() => setIsRightSidebarOpen(true)}
-              isMainAppPlaying={isMainAppPlaying}
-              highlightedNotes={highlightedNotes}
-              defaultTab="notes"
-              highlightChats={highlightChats}
-              onChatUpdate={handleChatUpdate}
-            />
-            <TextDisplay texts={texts} onClear={handleClearTextsOnly} />
-            {isInputEditing && (
-              <TextInput
-                textPosition={textPosition}
-                currentText={currentText}
-                setCurrentText={setCurrentText}
-                handleTextChange={handleTextChange}
-                handleKeyPress={handleKeyPress}
-                inputRef={inputRef}
-              />
-            )}
-            {/* Conditionally render AudioProgressBar */}
-            <AudioProgressBar 
-              isAudioPlaying={isAudioPlayingMain}
-              audioDuration={audioDurationMain}
-              audioProgress={audioProgressMain}
-              audioRef={audioRefMain}
-            />
-            <GlowStick 
-              isAudioPlaying={isAudioPlayingMain || isAudioPlaying} 
-              onToggleAudio={handleToggleNarrationMain}
-              onSkipForward={handleSkipForward}
-              onSkipBackward={handleSkipBackward}
-            />
-            <AudioPlayerMain
-              audioUrl={audioUrlMain}
-              setIsAudioPlaying={setIsAudioPlayingMain}
-              audioRef={audioRefMain}
-              setMainAppPlaying={setIsMainAppPlaying}
-              audioDuration={audioDurationMain}
-              onProgress={setAudioProgressMain}
-              onAudioEnded={handleAudioEndedMain}
-              isWaitingForNextParagraph={isWaitingForNextParagraphMain}
-              enableProgressTracking={showProgressBarMain}
-            />
-            <AudioPlayer
-              audioUrl={audioUrl}
-              setIsAudioPlaying={setIsAudioPlaying}
-              audioRef={audioRef}
-            />
-            {popupPosition && (
-              <HighlightPopup
-                position={popupPosition}
-                onHighlight={handleHighlight}
-                onRemove={handleRemoveHighlight}
-                onEdit={handleEditHighlight}
-                isEditing={isHighlightEditing}
-              />
-            )}
-            {contextMenuPosition && (
-              <ContextMenu
-                position={contextMenuPosition}
-                onStartPlayback={handleStartPlaybackFromPosition}
-                onClose={handleCloseContextMenu}
-              />
-            )}
-          </>
-        } />
-        <Route path="/murder-on-the-orient-express" element={
-          <>
-            <div ref={bookContainerRef}>
-              <MurderOrientExpress 
-                onToggleNarration={handleToggleNarrationMain}
-                isAudioPlaying={isAudioPlayingMain}
-              />
-            </div>
-            <RightSidebar 
-              isOpen={isRightSidebarOpen}
-              onClose={() => setIsRightSidebarOpen(false)}
-              onOpen={() => setIsRightSidebarOpen(true)}
-              isMainAppPlaying={isMainAppPlaying}
-              highlightedNotes={highlightedNotes}
-              defaultTab="notes"
-              highlightChats={highlightChats}
-              onChatUpdate={handleChatUpdate}
-            />
-            {/* Same UI components as other routes */}
-            <TextDisplay texts={texts} />
-            {isInputEditing && (
-              <TextInput
-                textPosition={textPosition}
-                currentText={currentText}
-                setCurrentText={setCurrentText}
-                handleTextChange={handleTextChange}
-                handleKeyPress={handleKeyPress}
-                inputRef={inputRef}
-              />
-            )}
-            <AudioProgressBar 
-              isAudioPlaying={isAudioPlayingMain}
-              audioDuration={audioDurationMain}
-              audioProgress={audioProgressMain}
-              audioRef={audioRefMain}
-            />
-            <GlowStick 
-              isAudioPlaying={isAudioPlayingMain || isAudioPlaying} 
-              onToggleAudio={handleToggleNarrationMain}
-              onSkipForward={handleSkipForward}
-              onSkipBackward={handleSkipBackward}
-            />
-            <AudioPlayerMain
-              audioUrl={audioUrlMain}
-              setIsAudioPlaying={setIsAudioPlayingMain}
-              audioRef={audioRefMain}
-              setMainAppPlaying={setIsMainAppPlaying}
-              audioDuration={audioDurationMain}
-              onProgress={setAudioProgressMain}
-              onAudioEnded={handleAudioEndedMain}
-              isWaitingForNextParagraph={isWaitingForNextParagraphMain}
-              enableProgressTracking={showProgressBarMain}
-            />
-            <AudioPlayer
-              audioUrl={audioUrl}
-              setIsAudioPlaying={setIsAudioPlaying}
-              audioRef={audioRef}
-            />
-            {popupPosition && (
-              <HighlightPopup
-                position={popupPosition}
-                onHighlight={handleHighlight}
-                onRemove={handleRemoveHighlight}
-                onEdit={handleEditHighlight}
-                isEditing={isHighlightEditing}
-              />
-            )}
-            {contextMenuPosition && (
-              <ContextMenu
-                position={contextMenuPosition}
-                onStartPlayback={handleStartPlaybackFromPosition}
-                onClose={handleCloseContextMenu}
-              />
-            )}
-          </>
-        } />
-        
-        <Route path="/1984" element={
-          <>
-            <div ref={bookContainerRef}>
-              <NineteenEightyFour 
-                onToggleNarration={handleToggleNarrationMain}
-                isAudioPlaying={isAudioPlayingMain}
-              />
-            </div>
-            <RightSidebar 
-              isOpen={isRightSidebarOpen}
-              onClose={() => setIsRightSidebarOpen(false)}
-              onOpen={() => setIsRightSidebarOpen(true)}
-              isMainAppPlaying={isMainAppPlaying}
-              highlightedNotes={highlightedNotes}
-              defaultTab="notes"
-              highlightChats={highlightChats}
-              onChatUpdate={handleChatUpdate}
-            />
-            {/* Rest of UI components same as other routes */}
-            <TextDisplay texts={texts} />
-            {isInputEditing && (
-              <TextInput
-                textPosition={textPosition}
-                currentText={currentText}
-                setCurrentText={setCurrentText}
-                handleTextChange={handleTextChange}
-                handleKeyPress={handleKeyPress}
-                inputRef={inputRef}
-              />
-            )}
-            <AudioProgressBar 
-              isAudioPlaying={isAudioPlayingMain}
-              audioDuration={audioDurationMain}
-              audioProgress={audioProgressMain}
-              audioRef={audioRefMain}
-            />
-            <GlowStick 
-              isAudioPlaying={isAudioPlayingMain || isAudioPlaying} 
-              onToggleAudio={handleToggleNarrationMain}
-              onSkipForward={handleSkipForward}
-              onSkipBackward={handleSkipBackward}
-            />
-            <AudioPlayerMain
-              audioUrl={audioUrlMain}
-              setIsAudioPlaying={setIsAudioPlayingMain}
-              audioRef={audioRefMain}
-              setMainAppPlaying={setIsMainAppPlaying}
-              audioDuration={audioDurationMain}
-              onProgress={setAudioProgressMain}
-              onAudioEnded={handleAudioEndedMain}
-              isWaitingForNextParagraph={isWaitingForNextParagraphMain}
-              enableProgressTracking={showProgressBarMain}
-            />
-            <AudioPlayer
-              audioUrl={audioUrl}
-              setIsAudioPlaying={setIsAudioPlaying}
-              audioRef={audioRef}
-            />
-            {popupPosition && (
-              <HighlightPopup
-                position={popupPosition}
-                onHighlight={handleHighlight}
-                onRemove={handleRemoveHighlight}
-                onEdit={handleEditHighlight}
-                isEditing={isHighlightEditing}
-              />
-            )}
-            {contextMenuPosition && (
-              <ContextMenu
-                position={contextMenuPosition}
-                onStartPlayback={handleStartPlaybackFromPosition}
-                onClose={handleCloseContextMenu}
-              />
-            )}
-          </>
-        } />
-        <Route path="/harry-potter" element={
-          <>
-            <div ref={bookContainerRef}>
-              <HarryPotter 
-                onToggleNarration={handleToggleNarrationMain}
-                isAudioPlaying={isAudioPlayingMain}
-              />
-            </div>
-            <RightSidebar 
-              isOpen={isRightSidebarOpen}
-              onClose={() => setIsRightSidebarOpen(false)}
-              onOpen={() => setIsRightSidebarOpen(true)}
-              isMainAppPlaying={isMainAppPlaying}
-              highlightedNotes={highlightedNotes}
-              defaultTab="notes"
-              highlightChats={highlightChats}
-              onChatUpdate={handleChatUpdate}
-            />
-            {/* Standard UI components - same as other routes */}
-            <TextDisplay texts={texts} />
-            {isInputEditing && (
-              <TextInput
-                textPosition={textPosition}
-                currentText={currentText}
-                setCurrentText={setCurrentText}
-                handleTextChange={handleTextChange}
-                handleKeyPress={handleKeyPress}
-                inputRef={inputRef}
-              />
-            )}
-            <AudioProgressBar 
-              isAudioPlaying={isAudioPlayingMain}
-              audioDuration={audioDurationMain}
-              audioProgress={audioProgressMain}
-              audioRef={audioRefMain}
-            />
-            <GlowStick 
-              isAudioPlaying={isAudioPlayingMain || isAudioPlaying} 
-              onToggleAudio={handleToggleNarrationMain}
-              onSkipForward={handleSkipForward}
-              onSkipBackward={handleSkipBackward}
-            />
-            <AudioPlayerMain
-              audioUrl={audioUrlMain}
-              setIsAudioPlaying={setIsAudioPlayingMain}
-              audioRef={audioRefMain}
-              setMainAppPlaying={setIsMainAppPlaying}
-              audioDuration={audioDurationMain}
-              onProgress={setAudioProgressMain}
-              onAudioEnded={handleAudioEndedMain}
-              isWaitingForNextParagraph={isWaitingForNextParagraphMain}
-              enableProgressTracking={showProgressBarMain}
-            />
-            <AudioPlayer
-              audioUrl={audioUrl}
-              setIsAudioPlaying={setIsAudioPlaying}
-              audioRef={audioRef}
-            />
-            {popupPosition && (
-              <HighlightPopup
-                position={popupPosition}
-                onHighlight={handleHighlight}
-                onRemove={handleRemoveHighlight}
-                onEdit={handleEditHighlight}
-                isEditing={isHighlightEditing}
-              />
-            )}
-            {contextMenuPosition && (
-              <ContextMenu
-                position={contextMenuPosition}
-                onStartPlayback={handleStartPlaybackFromPosition}
-                onClose={handleCloseContextMenu}
-              />
-            )}
-          </>
-        } />
-        <Route path="/brief-history-of-time" element={
-          <>
-            <div ref={bookContainerRef}>
-              <BriefHistoryOfTime 
-                onToggleNarration={handleToggleNarrationMain}
-                isAudioPlaying={isAudioPlayingMain}
-              />
-            </div>
-            <RightSidebar 
-              isOpen={isRightSidebarOpen}
-              onClose={() => setIsRightSidebarOpen(false)}
-              onOpen={() => setIsRightSidebarOpen(true)}
-              isMainAppPlaying={isMainAppPlaying}
-              highlightedNotes={highlightedNotes}
-              defaultTab="notes"
-              highlightChats={highlightChats}
-              onChatUpdate={handleChatUpdate}
-            />
-            {/* Standard UI components - same as other routes */}
-            <TextDisplay texts={texts} />
-            {isInputEditing && (
-              <TextInput
-                textPosition={textPosition}
-                currentText={currentText}
-                setCurrentText={setCurrentText}
-                handleTextChange={handleTextChange}
-                handleKeyPress={handleKeyPress}
-                inputRef={inputRef}
-              />
-            )}
-            <AudioProgressBar 
-              isAudioPlaying={isAudioPlayingMain}
-              audioDuration={audioDurationMain}
-              audioProgress={audioProgressMain}
-              audioRef={audioRefMain}
-            />
-            <GlowStick 
-              isAudioPlaying={isAudioPlayingMain || isAudioPlaying} 
-              onToggleAudio={handleToggleNarrationMain}
-              onSkipForward={handleSkipForward}
-              onSkipBackward={handleSkipBackward}
-            />
-            <AudioPlayerMain
-              audioUrl={audioUrlMain}
-              setIsAudioPlaying={setIsAudioPlayingMain}
-              audioRef={audioRefMain}
-              setMainAppPlaying={setIsMainAppPlaying}
-              audioDuration={audioDurationMain}
-              onProgress={setAudioProgressMain}
-              onAudioEnded={handleAudioEndedMain}
-              isWaitingForNextParagraph={isWaitingForNextParagraphMain}
-              enableProgressTracking={showProgressBarMain}
-            />
-            <AudioPlayer
-              audioUrl={audioUrl}
-              setIsAudioPlaying={setIsAudioPlaying}
-              audioRef={audioRef}
-            />
-            {popupPosition && (
-              <HighlightPopup
-                position={popupPosition}
-                onHighlight={handleHighlight}
-                onRemove={handleRemoveHighlight}
-                onEdit={handleEditHighlight}
-                isEditing={isHighlightEditing}
-              />
-            )}
-            {contextMenuPosition && (
-              <ContextMenu
-                position={contextMenuPosition}
-                onStartPlayback={handleStartPlaybackFromPosition}
-                onClose={handleCloseContextMenu}
-              />
-            )}
-          </>
-        } />
-        {/* Add a catch-all route for custom books */}
-        <Route path="*" element={
-          <>
-            <div ref={bookContainerRef} className="custom-book-content scrollable">
-              <div className="book-container">
-                {currentBook && (
-                  <div>
-                    <h1>{currentBook.title}</h1>
-                    <h3>by {currentBook.author} ({currentBook.publicationYear})</h3>
-                    
-                    {currentBook.content ? (
-                      <div className="custom-book-text">
-                        {currentBook.content}
-                      </div>
-                    ) : (
-                      <div className="custom-book-placeholder">
-                        <p>This is a custom book. You can add content by uploading a text file when creating or editing the book.</p>
-                        <p>You can ask questions about this book and the AI will use the system prompt you provided.</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-            {/* Rest of the components remain the same */}
+      <div ref={bookContainerRef} className="book-content-container">
+        {renderBookContent()}
+      </div>
+
             <RightSidebar 
               isOpen={isRightSidebarOpen}
               onClose={() => setIsRightSidebarOpen(false)}
@@ -1184,23 +775,18 @@ function AppContent() {
                 onClose={handleCloseContextMenu}
               />
             )}
-          </>
-        } />
-      </Routes>
     </div>
   );
 }
 
-// Main App component now just provides context
+// Main App component now just provides context without Router
 function App() {
   return (
-    <Router>
       <BookProvider>
         <ChatProvider>
           <AppContent />
         </ChatProvider>
       </BookProvider>
-    </Router>
   );
 }
 

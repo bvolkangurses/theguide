@@ -66,3 +66,113 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+.book-link {
+  cursor: pointer;
+  padding: 10px;
+  margin: 5px 0;
+  border-radius: 5px;
+  transition: all 0.2s ease;
+}
+
+.book-link:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #646cff;
+  font-weight: 500;
+}
+
+.book-link.active {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: #646cff;
+  font-weight: 500;
+}
+
+.book-link .book-title {
+  transition: all 0.2s ease;
+}
+
+.book-link:hover .book-title {
+  color: #646cff;
+  font-weight: 500;
+}
+
+.book-content-container {
+  width: 1000px;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.book-container {
+  width: 100%;
+  margin: 0 auto;
+  padding: 20px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.custom-book-content {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.custom-book-text {
+  line-height: 1.6;
+  font-size: 1.1em;
+  margin-top: 20px;
+}
+
+.custom-book-placeholder {
+  text-align: center;
+  padding: 40px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.current-paragraph {
+  background-color: rgba(100, 108, 255, 0.1);
+  border-left: 3px solid #646cff;
+  padding-left: 10px;
+  transition: all 0.3s ease;
+}
+
+.current-paragraph::before {
+  content: "▶";
+  margin-right: 8px;
+  color: #646cff;
+  font-size: 0.8em;
+  vertical-align: middle;
+  display: inline-block;
+  animation: pulse 2s infinite;
+}
+
+.last-read-paragraph {
+  background-color: rgba(100, 108, 255, 0.05);
+  border-left: 2px solid #646cff;
+  padding-left: 10px;
+  transition: all 0.3s ease;
+}
+
+.last-read-paragraph::before {
+  content: "⏸";
+  margin-right: 8px;
+  color: #646cff;
+  font-size: 0.8em;
+  vertical-align: middle;
+  display: inline-block;
+  opacity: 0.7;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}

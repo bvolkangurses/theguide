@@ -25,7 +25,6 @@ const AddBookModal = ({ isOpen, onClose, onAddBook, bookToEdit }) => {
           title: bookToEdit.title || '',
           author: bookToEdit.author || '',
           publicationYear: bookToEdit.publicationYear || new Date().getFullYear(),
-          path: bookToEdit.path || '',
           content: bookToEdit.content || '',
           systemPrompt: bookToEdit.systemPrompt || ''
         });
@@ -36,7 +35,6 @@ const AddBookModal = ({ isOpen, onClose, onAddBook, bookToEdit }) => {
           title: '',
           author: '',
           publicationYear: new Date().getFullYear(),
-          path: '',
           content: '',
           systemPrompt: ''
         });
@@ -59,21 +57,6 @@ const AddBookModal = ({ isOpen, onClose, onAddBook, bookToEdit }) => {
       }));
     }
   }, [bookData.author, bookData.title, bookToEdit]);
-  
-  // Path generator based on title (only for new books)
-  useEffect(() => {
-    if (bookData.title && !bookToEdit) {
-      const generatedPath = `/${bookData.title
-        .toLowerCase()
-        .replace(/[^\w\s]/g, '')
-        .replace(/\s+/g, '-')}`;
-      
-      setBookData(prev => ({
-        ...prev,
-        path: generatedPath
-      }));
-    }
-  }, [bookData.title, bookToEdit]);
   
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -130,12 +113,6 @@ const AddBookModal = ({ isOpen, onClose, onAddBook, bookToEdit }) => {
       newErrors.author = 'Author is required';
     }
     
-    if (!bookData.path.trim()) {
-      newErrors.path = 'Path is required';
-    } else if (!bookData.path.startsWith('/')) {
-      newErrors.path = 'Path must start with /';
-    }
-    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -151,14 +128,18 @@ const AddBookModal = ({ isOpen, onClose, onAddBook, bookToEdit }) => {
       // Update existing book
       const updatedBook = {
         ...bookToEdit,
-        ...bookData
+        ...bookData,
+        // Ensure path is preserved when editing
+        path: bookToEdit.path || `/book/custom-${bookToEdit.id}`
       };
       onAddBook(updatedBook);
     } else {
-      // Create new book with custom ID
+      // Create new book with custom ID and path
+      const customId = `custom-${Date.now()}`;
       const newBook = {
         ...bookData,
-        id: `custom-${Date.now()}`,
+        id: customId,
+        path: `/book/${customId}`, // Generate a valid path for navigation
         authorVoiceID: 'default',
         isCustom: true // Ensure the book is marked as custom
       };
@@ -217,21 +198,6 @@ const AddBookModal = ({ isOpen, onClose, onAddBook, bookToEdit }) => {
                 value={bookData.publicationYear}
                 onChange={handleInputChange}
               />
-            </div>
-            
-            <div className="form-group">
-              <label htmlFor="path">URL Path</label>
-              <input
-                type="text"
-                id="path"
-                name="path"
-                value={bookData.path}
-                onChange={handleInputChange}
-                className={errors.path ? 'error' : ''}
-                disabled={bookToEdit} // Path should not be editable for existing books
-              />
-              {errors.path && <div className="error-message">{errors.path}</div>}
-              <small>Path must start with / (e.g., /my-book){bookToEdit ? ' - Cannot be changed for existing books' : ''}</small>
             </div>
             
             <div className="file-upload-group">

@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import { DEFAULT_BOOKS_METADATA } from '../utils/serverBookMetadata';
 
 // Create context
@@ -16,8 +15,6 @@ export const useBooks = () => {
 
 // Provider component
 export const BookProvider = ({ children }) => {
-  const location = useLocation();
-  const navigate = useNavigate();
   const [books, setBooks] = useState([]);
   const [customBooks, setCustomBooks] = useState([]);
   const [currentBook, setCurrentBook] = useState(null);
@@ -41,16 +38,12 @@ export const BookProvider = ({ children }) => {
   useEffect(() => {
     const allBooks = [...DEFAULT_BOOKS_METADATA, ...customBooks];
     setBooks(allBooks);
-  }, [customBooks]);
-  
-  // Update current book when location changes
-  useEffect(() => {
-    if (books.length > 0) {
-      const currentPath = location.pathname;
-      const matchedBook = books.find(book => book.path === currentPath) || books[0];
-      setCurrentBook(matchedBook);
+    
+    // Set initial book if none is selected
+    if (!currentBook && allBooks.length > 0) {
+      setCurrentBook(allBooks[0]);
     }
-  }, [location, books]);
+  }, [customBooks]);
   
   // Function to add a new custom book or update an existing one
   const addCustomBook = (bookData) => {
@@ -94,10 +87,8 @@ export const BookProvider = ({ children }) => {
       }
     }
     
-    // Navigate to the book's path if provided
-    if (bookData.path) {
-      navigate(bookData.path);
-    }
+    // Set the new/updated book as current
+    setCurrentBook(bookData);
   };
   
   // Function to remove a custom book
@@ -112,16 +103,29 @@ export const BookProvider = ({ children }) => {
       console.error('Error saving custom books after removal:', error);
     }
     
-    // If the current book is being removed, navigate to the first available book
+    // If the current book is being removed, set the first available book as current
     if (currentBook && currentBook.id === bookId) {
       const firstBook = books.find(book => book.id !== bookId);
       if (firstBook) {
-        navigate(firstBook.path);
+        setCurrentBook(firstBook);
       }
     }
   };
   
-  // Add the missing setCurrentBookByPath function
+  // Function to set current book by ID
+  const setCurrentBookById = (bookId) => {
+    // Don't do anything if books aren't loaded yet
+    if (!books || books.length === 0) {
+      return;
+    }
+    
+    const book = books.find(b => b.id === bookId);
+    if (book) {
+      setCurrentBook(book);
+    }
+  };
+  
+  // Function to set current book by path (for backward compatibility)
   const setCurrentBookByPath = (path) => {
     // Don't do anything if books aren't loaded yet
     if (!books || books.length === 0) {
@@ -129,21 +133,11 @@ export const BookProvider = ({ children }) => {
       return;
     }
     
-    // Only navigate if we're not already on this path
-    if (location.pathname !== path) {
-      const book = books.find(b => b.path === path);
-      if (book) {
-        setCurrentBook(book);
-        navigate(path);
-      } else {
-        console.error(`No book found with path: ${path}. Available paths: ${books.map(b => b.path).join(', ')}`);
-      }
+    const book = books.find(b => b.path === path);
+    if (book) {
+      setCurrentBook(book);
     } else {
-      // If we're already on the right path, just set the current book without navigating
-      const book = books.find(b => b.path === path);
-      if (book) {
-        setCurrentBook(book);
-      }
+      console.error(`No book found with path: ${path}`);
     }
   };
   
@@ -156,6 +150,7 @@ export const BookProvider = ({ children }) => {
         addCustomBook,
         removeCustomBook,
         customBooks,
+        setCurrentBookById,
         setCurrentBookByPath
       }}
     >

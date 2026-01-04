@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { FaBook, FaTrash, FaEraser, FaBars, FaBroom, FaPlus, FaEdit, FaTimes } from 'react-icons/fa';
-import { Link, useLocation } from "react-router-dom";
 import { useChat } from '../contexts/ChatContext';
 import { useBooks } from '../contexts/BookContext';
 import { clearAudioCache, clearBookAudioCache } from '../utils/audioCache';
@@ -10,8 +9,7 @@ import AddBookModal from './AddBookModal';
 
 const Sidebar = ({ isOpen, onClose, onOpen, onClearTexts }) => {
   const { clearMessages } = useChat();
-  const location = useLocation();
-  const { books, loading, currentBook, addCustomBook, removeCustomBook, customBooks, setCurrentBookByPath } = useBooks();
+  const { books, loading, currentBook, addCustomBook, removeCustomBook, customBooks, setCurrentBookById } = useBooks();
   const [isAddBookModalOpen, setIsAddBookModalOpen] = useState(false);
   const [bookToEdit, setBookToEdit] = useState(null);
   
@@ -56,6 +54,9 @@ const Sidebar = ({ isOpen, onClose, onOpen, onClearTexts }) => {
       // Clear book-specific audio cache
       clearBookAudioCache(bookId);
       
+      // Clear chat messages
+      clearMessages();
+      
       // Refresh the page to reset all components
       window.location.reload();
   };
@@ -89,6 +90,16 @@ const Sidebar = ({ isOpen, onClose, onOpen, onClearTexts }) => {
     setIsAddBookModalOpen(false);
   };
 
+  // New handler for book selection
+  const handleBookSelect = (book) => {
+    if (book && book.id) {
+      setCurrentBookById(book.id);
+      onClose();
+    } else {
+      console.error('Invalid book object:', book);
+    }
+  };
+
   return (
     <>
       <div className={`sidebar-left ${isOpen ? 'open' : ''}`} onClick={(e) => {
@@ -115,14 +126,14 @@ const Sidebar = ({ isOpen, onClose, onOpen, onClearTexts }) => {
                 {books && books.length > 0 ? books.map(book => (
                   <li key={book.id || Math.random()}>
                     <div className="book-item">
-                      <Link 
-                        to={book.path} 
-                        className={`book-link ${location.pathname === book.path ? 'active' : ''} ${book.isCustom ? 'custom-book' : ''}`}
+                      <div 
+                        className={`book-link ${currentBook?.id === book.id ? 'active' : ''} ${book.isCustom ? 'custom-book' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleBookSelect(book);
+                        }}
                       >
-                        <div className="book-link-content" onClick={() => {
-                          setCurrentBookByPath(book.path);
-                          onClose();
-                        }}>
+                        <div className="book-link-content">
                           <div className={`book-title ${isShortTitle(book.title) ? 'short-title' : ''}`}>
                             {book.title}
                           </div>
@@ -130,7 +141,7 @@ const Sidebar = ({ isOpen, onClose, onOpen, onClearTexts }) => {
                             <div className="book-author">by {book.author} ({book.publicationYear})</div>
                           )}
                         </div>
-                      </Link>
+                      </div>
                       
                       {/* Add edit/delete buttons for custom books */}
                       {book.isCustom && (
